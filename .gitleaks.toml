@@ -1,0 +1,18 @@
+title = "sky_healthcare gitleaks config"
+
+# Gitleaks' default ruleset: generic API keys, cloud credentials, private keys, tokens.
+[extend]
+useDefault = true
+
+# Docs and test fixtures may hold credential-shaped strings that are not real secrets.
+[allowlist]
+description = "Docs and test fixtures, not production credentials"
+paths = [
+  '''(?i)^docs/''',
+  '''(?i)\.md$''',
+  '''(?i)/?tests?/fixtures/.*''',
+]
+regexes = [
+  '''(?i)sandbox''',
+  '''(?i)example\.com''',
+]
