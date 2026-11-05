@@ -38,6 +38,7 @@ import Btn from './Btn.vue'
 import MedicinePicker from './MedicinePicker.vue'
 import { write } from '@/api'
 import { t } from '@/i18n'
+import { saved } from '@/offline/notify'
 import { num } from '@/format'
 import { ui, changed } from '@/ui'
 
@@ -65,10 +66,9 @@ async function save() {
   if (!(Number(form.qty) > 0)) return (error.value = t('Please enter a quantity above 0.'))
   saving.value = true
   try {
-    const res = await write('request_stock', { ...form }, t('Medical request'))
+    const res = await write('request_stock', { ...form }, t('Medical request'), { summary: `${form.medicine} × ${num(form.qty)}` })
     ui.request.open = false
-    if (res.queued) toast.info(t('Saved offline'), { description: t('The request will be sent when you are back online.') })
-    else toast.success(t('Request sent'), { description: t('It is waiting for approval.') })
+    saved(res, t('Request sent'), t('It is waiting for approval.'))
     changed()
   } catch (e) {
     error.value = e.message

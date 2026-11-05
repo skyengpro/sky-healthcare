@@ -31,6 +31,7 @@ import Btn from './Btn.vue'
 import MedicinePicker from './MedicinePicker.vue'
 import { write } from '@/api'
 import { t } from '@/i18n'
+import { saved } from '@/offline/notify'
 import { num, today } from '@/format'
 import { session } from '@/session'
 import { ui, changed } from '@/ui'
@@ -56,11 +57,10 @@ async function save() {
   if (form.expiry <= form.date) return (error.value = t('The expiry date must be after the date received.'))
   saving.value = true
   try {
-    const res = await write('add_stock', { ...form }, t('Add stock'))
-    ui.addStock.open = false
     const name = picked.value?.name || form.medicine
-    if (res.queued) toast.info(t('Saved offline'), { description: t('{0} × {1} will be sent when you are back online.', num(form.qty), name) })
-    else toast.success(t('Stock added'), { description: `${num(form.qty)} × ${name}` })
+    const res = await write('add_stock', { ...form }, t('Add stock'), { summary: `${name} × ${num(form.qty)}` })
+    ui.addStock.open = false
+    saved(res, t('Stock added'), `${num(form.qty)} × ${name}`)
     changed()
   } catch (e) {
     error.value = e.message

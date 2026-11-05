@@ -130,6 +130,26 @@ Translations: English is in the code, French in `frontend/src/fr.js`.
 
 Code style: `pre-commit install` in the repository. Python is checked with ruff (tabs, 110 columns).
 
+## Working offline
+
+The app keeps working with no connection and syncs by itself when the connection returns.
+
+- **Reading:** the app, its logo and fonts, and the data people use most (lists, reference data, the files of the
+  most recent patients and medicines) are kept on the device (service worker and IndexedDB). A screen that was
+  never opened is still available if it was in the background copy made after sign-in.
+- **Writing:** stock in and out, medical requests, medicines, categories, patients, consultations, treatments and
+  treatment types are saved on the device when there is no connection, shown as already done (stock numbers move,
+  new patients and medicines appear tagged as waiting), and sent in order when the connection returns.
+- **No duplicates:** every change carries a `client_id`. The server recognises one it already recorded, so a change
+  sent twice is done once. A record made offline gets a temporary `local:` id, replaced by the real one when sent;
+  later changes that mention it are rewritten automatically.
+- **Indicator:** a bar slides in when the connection is lost, shows "Sending..." and then "All changes are sent"
+  when it returns, and a pill in the top bar lists the waiting changes (with Try again / Discard for refused ones).
+- **Needs a connection:** managing staff, changing a password, approving or rejecting requests and deleting a medicine
+  or a category.
+- **Build note:** after `npm run build`, restart the backend (or run `bench clear-website-cache`) so the page that
+  points to the new files is served.
+
 ## Tests
 
 The tests run against a live site with the app installed and two users, a Pharmacy Staff and a
@@ -150,6 +170,13 @@ node tests/e2e.mjs <site-url> <staff-email> <staff-pw> <admin-email> <admin-pw> 
 # Care flow through the UI: medicine, patient, treatment type, treatments, cancel, consultation, dashboard
 node tests/care_e2e.mjs <site-url> <staff-email> <staff-pw> <admin-email> <admin-pw> [screenshot-dir]
 ```
+
+```bash
+node tests/offline_e2e.mjs <site-url> <staff-email> <staff-pw>
+```
+
+`tests/offline_e2e.mjs` cuts the network, uses the app (patient, consultation, medicine, stock), reconnects and checks
+on the server that everything arrived once.
 
 `tests/e2e.mjs` expects the staff user's full name to be "Grace Mbarga".
 

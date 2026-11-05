@@ -69,7 +69,8 @@ import { ErrorMessage, FormControl, toast } from 'frappe-ui'
 import Btn from './Btn.vue'
 import MedicineRows from './MedicineRows.vue'
 import PatientPicker from './PatientPicker.vue'
-import { get, post } from '@/api'
+import { get, write } from '@/api'
+import { saved } from '@/offline/notify'
 import { t } from '@/i18n'
 import { date, today } from '@/format'
 import { newRow } from '@/care'
@@ -125,13 +126,14 @@ async function save() {
   if (items.some((r) => !(Number(r.qty) > 0))) return (error.value = t('Please enter a quantity above 0.'))
   saving.value = true
   try {
-    const res = await post(H('record_procedure'), {
-      patient: form.patient, template: form.template, date: form.date, notes: form.notes, complete: form.complete ? 1 : 0, service_request: ui.procedure.serviceRequest || undefined,
-      items: items.map((r) => ({ medicine: r.medicine, qty: Number(r.qty) })), client_id: crypto.randomUUID?.() || String(Date.now()),
-    })
+    const done = !!form.complete
+    const res = await write(H('record_procedure'), {
+      patient: form.patient, template: form.template, date: form.date, notes: form.notes, complete: done ? 1 : 0, service_request: ui.procedure.serviceRequest || undefined,
+      items: items.map((r) => ({ medicine: r.medicine, qty: Number(r.qty) })),
+    }, done ? t('Record a treatment') : t('Plan a treatment'), { summary: form.template, stub: () => ({ status: done ? 'Completed' : 'Pending' }) })
     ui.procedure.open = false
-    toast.success(res.status === 'Completed' ? t('Treatment recorded') : t('Treatment planned'),
-      { description: res.status === 'Completed' && items.length ? t('{0} medicine(s) taken from stock', items.length) : '' })
+    saved(res, res.status === 'Completed' ? t('Treatment recorded') : t('Treatment planned'),
+      res.status === 'Completed' && items.length ? t('{0} medicine(s) taken from stock', items.length) : '')
     changed()
   } catch (e) {
     error.value = e.message

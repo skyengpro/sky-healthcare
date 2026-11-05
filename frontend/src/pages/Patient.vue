@@ -15,6 +15,8 @@
         </template>
       </PageHeader>
 
+      <PendingChanges :items="waitingHere" />
+
       <!-- care that was asked and is not done yet -->
       <div v-if="p.treatments_requested.length" class="mb-4 space-y-2">
         <div v-for="r in p.treatments_requested" :key="r.name" class="flex flex-wrap items-center gap-3 rounded-[16px] border border-warn/20 bg-warn-soft px-4 py-3 text-warn">
@@ -123,6 +125,9 @@
 </template>
 
 <script setup>
+import PendingChanges from '@/components/PendingChanges.vue'
+import { pendingForPatient } from '@/offline/pending'
+import { net } from '@/api'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'frappe-ui'
@@ -138,6 +143,7 @@ import { ageLabel, blood, dosageLabel, durationLabel, usedLine } from '@/care'
 import { ui, H, openPatient, openProcedure } from '@/ui'
 
 const props = defineProps({ name: String })
+const waitingHere = computed(() => pendingForPatient(net.outbox, props.name))
 const router = useRouter()
 const p = ref(null)
 const tab = ref('timeline')

@@ -96,7 +96,7 @@ async function submit() {
   try {
     await login(email.value.trim(), password.value)
   } catch (e) {
-    error.value = t(e.message)
+    error.value = !navigator.onLine || e instanceof TypeError ? t('You are offline. Signing in needs a connection.') : t(e.message)
     loading.value = false
   }
 }

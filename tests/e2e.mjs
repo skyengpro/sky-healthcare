@@ -228,24 +228,36 @@ await shot(staff, '07-reports')
 await check('movements report lists the new medicine', (await text(staff)).includes(MED))
 
 // ---- offline ----------------------------------------------------------------------------
+// the changes waiting to be sent are kept in IndexedDB
+const waitingCount = (page) =>
+  page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const open = indexedDB.open('sky_healthcare')
+        open.onsuccess = () => {
+          const get = open.result.transaction('meta').objectStore('meta').get('outbox')
+          get.onsuccess = () => resolve((get.result || []).length)
+        }
+      }),
+  )
 await staff.goto(`${SITE}/sky-healthcare/give-out`, { waitUntil: 'networkidle0' })
 await sleep(1500)
 await staff.setOfflineMode(true)
 await staff.reload({ waitUntil: 'domcontentloaded' })
 await waitText(staff, 'Record stock out', 15000)
 await check('app opens with no connection (served by the service worker)', true)
-await staff.waitForFunction(() => document.body.innerText.includes('You are offline'), { timeout: 10000 })
+await staff.waitForFunction(() => document.body.innerText.includes("You're offline"), { timeout: 10000 })
 await check('offline banner is shown', true)
 await pickMedicine(staff, MED)
 await fill(staff, 'Quantity', '5')
 await click(staff, 'Record stock out')
 await sleep(800)
-const queued = await staff.evaluate(() => JSON.parse(localStorage.getItem('sky_healthcare.outbox') || '[]').length)
+const queued = await waitingCount(staff)
 await check('stock out made offline is kept on the device', queued === 1)
 await shot(staff, '08-offline')
 await staff.setOfflineMode(false)
 await staff.evaluate(() => window.dispatchEvent(new Event('online')))
-await staff.waitForFunction(() => JSON.parse(localStorage.getItem('sky_healthcare.outbox') || '[]').length === 0, { timeout: 15000 })
+for (let i = 0; i < 30 && (await waitingCount(staff)); i++) await sleep(500)
 med = await api(staff, 'medicine', { code: MED })
 await check('offline stock out is sent when back online (45 - 5 = 40), exactly once', med.stock === 40)
 

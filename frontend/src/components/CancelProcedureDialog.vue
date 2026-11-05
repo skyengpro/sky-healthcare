@@ -32,7 +32,8 @@ import Sheet from './Sheet.vue'
 import { computed, ref, watch } from 'vue'
 import { ErrorMessage, FormControl, toast } from 'frappe-ui'
 import Btn from './Btn.vue'
-import { post } from '@/api'
+import { write } from '@/api'
+import { saved } from '@/offline/notify'
 import { t } from '@/i18n'
 import { date } from '@/format'
 import { usedLine } from '@/care'
@@ -58,9 +59,9 @@ async function save() {
   if (completed.value && !reason.value.trim()) return (error.value = t('Please give the reason for cancelling.'))
   saving.value = true
   try {
-    const res = await post(H('cancel_procedure'), { name: p.value.name, reason: reason.value })
+    const res = await write(H('cancel_procedure'), { name: p.value.name, reason: reason.value }, t('Cancel treatment'), { summary: p.value.procedure_template })
     ui.cancelProc.open = false
-    toast.success(t('Treatment cancelled'), { description: res.stock_returned ? t('The medicines are back in stock.') : '' })
+    saved(res, t('Treatment cancelled'), res.stock_returned ? t('The medicines are back in stock.') : '')
     changed()
   } catch (e) {
     error.value = e.message

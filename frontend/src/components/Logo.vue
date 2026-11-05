@@ -11,6 +11,7 @@
 </template>
 
 <script setup>
-const MARK = '/assets/sky_healthcare/images/logo-mark.svg'
+// served from the app's own build folder, so the offline copy of the app includes it
+const MARK = `${import.meta.env.BASE_URL}logo-mark.svg`
 defineProps({ markOnly: Boolean, subtitle: String, inverted: Boolean, markClass: { type: String, default: 'size-10' } })
 </script>

@@ -165,7 +165,8 @@ import StatusBadge from '@/components/StatusBadge.vue'
 import TagInput from '@/components/TagInput.vue'
 import PatientPicker from '@/components/PatientPicker.vue'
 import MedicinePicker from '@/components/MedicinePicker.vue'
-import { get, post } from '@/api'
+import { get, write } from '@/api'
+import { saved } from '@/offline/notify'
 import { t } from '@/i18n'
 import { date, num } from '@/format'
 import { dosageLabel, durationLabel } from '@/care'
@@ -258,15 +259,17 @@ async function save(finish) {
   const rx = form.prescriptions.filter((r) => r.medicine)
   saving.value = finish ? 'finish' : 'draft'
   try {
-    const res = await post(H('save_consultation'), {
+    const res = await write(H('save_consultation'), {
       name: isNew.value ? undefined : props.name, patient: form.patient, practitioner: form.practitioner,
       symptoms: form.symptoms, diagnoses: form.diagnoses, notes: form.notes, vitals: form.vitals,
       prescriptions: rx.map((r) => ({ medicine: r.medicine, dosage: r.dosage, period: r.period, comment: r.comment })), treatments: form.treatments, finish: finish ? 1 : 0,
-    })
-    toast.success(finish ? t('Consultation finished') : t('Draft saved'),
-      finish ? { description: [rx.length && t('{0} medicine(s) prescribed', rx.length), form.treatments.length && t('{0} treatment(s) asked', form.treatments.length)].filter(Boolean).join(' · ') } : {})
+    }, finish ? t('Finish a consultation') : t('Save a draft'), { summary: [lockedName.value || form.patient, form.notes].filter(Boolean).join(' · ') })
+    saved(res, finish ? t('Consultation finished') : t('Draft saved'),
+      finish ? [rx.length && t('{0} medicine(s) prescribed', rx.length), form.treatments.length && t('{0} treatment(s) asked', form.treatments.length)].filter(Boolean).join(' · ') : '')
     ui.version++
-    if (isNew.value) router.replace({ name: 'consultation', params: { name: res.name } })
+    // a consultation kept on the device has no page yet: its patient's file shows it as waiting
+    if (res.queued) router.replace({ name: 'patient', params: { name: form.patient } })
+    else if (isNew.value) router.replace({ name: 'consultation', params: { name: res.name } })
     else load()
   } catch (e) {
     error.value = e.message
@@ -285,8 +288,9 @@ async function saveEdit() {
   if (!form.practitioner) return (error.value = t('Please choose the doctor.'))
   saving.value = 'edit'
   try {
-    await post(H('update_consultation'), { name: props.name, practitioner: form.practitioner, symptoms: form.symptoms, diagnoses: form.diagnoses, notes: form.notes, vitals: form.vitals })
-    toast.success(t('Consultation updated'))
+    const res = await write(H('update_consultation'), { name: props.name, practitioner: form.practitioner, symptoms: form.symptoms, diagnoses: form.diagnoses, notes: form.notes, vitals: form.vitals },
+      t('Edit a consultation'), { summary: lockedName.value || form.patient })
+    saved(res, t('Consultation updated'))
     editing.value = false
     ui.version++
     await load()
@@ -302,8 +306,8 @@ function discard() {
     title: t('Discard this draft?'), message: t('Nothing has been ordered yet. The draft is deleted.'), confirmLabel: t('Discard'),
     onConfirm: async () => {
       try {
-        await post(H('discard_consultation'), { name: props.name })
-        toast.success(t('Draft discarded'))
+        const res = await write(H('discard_consultation'), { name: props.name }, t('Discard a draft'), { summary: lockedName.value || form.patient })
+        saved(res, t('Draft discarded'))
         router.replace({ name: 'patient', params: { name: form.patient } })
       } catch (e) {
         toast.error(e.message)

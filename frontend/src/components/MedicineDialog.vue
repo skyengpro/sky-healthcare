@@ -68,7 +68,8 @@ import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ErrorMessage, FormControl, toast, dialog } from 'frappe-ui'
 import Btn from './Btn.vue'
-import { get, post, ApiError } from '@/api'
+import { get, post, write, ApiError } from '@/api'
+import { saved } from '@/offline/notify'
 import { t } from '@/i18n'
 import { num, today } from '@/format'
 import { session } from '@/session'
@@ -110,12 +111,13 @@ async function addCategory() {
   if (!name) return
   newCat.saving = true
   try {
-    const r = await post('add_category', { name })
+    const r = await write('add_category', { name }, t('New category'), { summary: name, stub: () => ({ name, created: true }) })
     if (!session.options.categories.includes(r.name)) session.options.categories.push(r.name)
     session.options.categories.sort((a, b) => a.localeCompare(b))
     form.category = r.name
     Object.assign(newCat, { open: false, name: '' })
-    toast.success(r.created ? t('Category added') : t('This category already exists'), { description: r.name })
+    if (r.queued) saved(r)
+    else toast.success(r.created ? t('Category added') : t('This category already exists'), { description: r.name })
   } catch (e) {
     toast.error(e.message)
   } finally {
@@ -150,10 +152,16 @@ async function save() {
   }
   saving.value = true
   try {
-    const res = await post('save_medicine', { ...form, code: ui.medicine.code || undefined })
+    if (!editing.value) {
+      // the same name as a medicine already on the list (also checked offline, against the copy on this device)
+      const known = ((await get('medicines').catch(() => [])) || []).some((m) => m.name.trim().toLowerCase() === form.name.trim().toLowerCase())
+      if (known) throw new ApiError('', 417, 'DuplicateEntryError')
+    }
+    const res = await write('save_medicine', { ...form, code: ui.medicine.code || undefined }, editing.value ? t('Edit medicine') : t('New medicine'),
+      { creates: editing.value ? undefined : 'medicine', idField: 'code', summary: form.name })
     ui.medicine.open = false
-    if (editing.value) toast.success(t('Medicine updated'))
-    else toast.success(t('Medicine added'), Number(form.qty) > 0 ? { description: t('{0} {1} in stock', num(form.qty), t(form.unit)) } : {})
+    if (editing.value) saved(res, t('Medicine updated'))
+    else saved(res, t('Medicine added'), Number(form.qty) > 0 ? t('{0} {1} in stock', num(form.qty), t(form.unit)) : '')
     changed()
     if (!editing.value) router.push({ name: 'medicine', params: { code: res.code } })
   } catch (e) {

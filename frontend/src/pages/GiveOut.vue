@@ -96,6 +96,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import MedicinePicker from '@/components/MedicinePicker.vue'
 import { get, write } from '@/api'
 import { t } from '@/i18n'
+import { saved } from '@/offline/notify'
 import { date, num, shortDate } from '@/format'
 import { session } from '@/session'
 import { ui, changed } from '@/ui'
@@ -132,10 +133,9 @@ async function save() {
       : t('Not enough valid stock. Only {0} available.', num(available.value)))
   saving.value = true
   try {
-    const res = await write('give_out', { ...form }, t('Give out'))
     const name = picked.value?.name || form.medicine
-    if (res.queued) toast.info(t('Saved offline'), { description: t('{0} × {1} will be sent when you are back online.', num(form.qty), name) })
-    else toast.success(t('Stock out recorded'), { description: `${num(form.qty)} × ${name}` })
+    const res = await write('give_out', { ...form }, t('Give out'), { summary: `${name} × ${num(form.qty)}` })
+    saved(res, t('Stock out recorded'), `${num(form.qty)} × ${name}`)
     reset()
     changed()
   } catch (e) {
