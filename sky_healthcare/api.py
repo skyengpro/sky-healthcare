@@ -1,4 +1,4 @@
-"""Server API for the PharmaStock app.
+"""Server API for the Healthcare Management app.
 
 Every function checks the caller's pharmacy role first, then does the stock work with ERPNext on
 the user's behalf. Staff never need ERPNext permissions of their own, and each write is one
@@ -95,11 +95,12 @@ def _as_system():
 	user as their owner, see `_owner`.
 	"""
 	user = frappe.session.user
-	frappe.set_user("Administrator")
+	# the caller already passed the pharmacy role check in `_writes`; the real user is restored below
+	frappe.set_user("Administrator")  # nosemgrep
 	try:
 		yield user
 	finally:
-		frappe.set_user(user)
+		frappe.set_user(user)  # nosemgrep
 
 
 def _writes(admin=False):
@@ -149,7 +150,9 @@ def _existing(doctype, client_id):
 # ------------------------------------------------------------------ boot
 
 
-@frappe.whitelist(allow_guest=True)
+# Guests must be able to call this: the login screen asks it who is logged in and for a CSRF token.
+# It returns nothing but {"user": None} unless the caller is a pharmacy user.
+@frappe.whitelist(allow_guest=True)  # nosemgrep
 def boot():
 	"""Everything the app needs at start. Also returns a fresh CSRF token, so a cached page can still post."""
 	if frappe.session.user == "Guest":
@@ -216,26 +219,18 @@ def boot():
 
 
 def _medicine_rows(search=None, category=None, name=None):
-	conditions, values = (
-		["i.disabled = 0", "i.is_stock_item = 1", "i.item_group in %(groups)s"],
-		{
-			"groups": _medicine_groups() or [""],
-			"wh": _warehouse(),
-			"today": nowdate(),
-			"soon": add_days(nowdate(), EXPIRY_WARNING_DAYS),
-		},
-	)
-	if name:
-		conditions.append("i.name = %(name)s")
-		values["name"] = name
-	if search:
-		conditions.append("(i.item_name like %(search)s or i.name like %(search)s)")
-		values["search"] = f"%{search}%"
-	if category:
-		conditions.append("i.item_group = %(category)s")
-		values["category"] = category
+	# optional filters are passed as NULL when unused, so the query text never changes
+	values = {
+		"groups": _medicine_groups() or [""],
+		"wh": _warehouse(),
+		"today": nowdate(),
+		"soon": add_days(nowdate(), EXPIRY_WARNING_DAYS),
+		"name": name or None,
+		"search": f"%{search}%" if search else None,
+		"category": category or None,
+	}
 	return frappe.db.sql(
-		f"""
+		"""
 		select i.name as code, i.item_name as name, i.item_group as category, i.custom_dosage_form as form,
 			i.custom_strength as strength, i.custom_location as location, i.stock_uom as unit, i.description,
 			coalesce((select sum(b.actual_qty) from `tabBin` b where b.item_code = i.name and b.warehouse = %(wh)s), 0) as stock,
@@ -247,7 +242,10 @@ def _medicine_rows(search=None, category=None, name=None):
 			coalesce((select sum(bt.batch_qty) from `tabBatch` bt where bt.item = i.name and bt.batch_qty > 0 and bt.disabled = 0
 				and bt.expiry_date >= %(today)s and bt.expiry_date <= %(soon)s), 0) as expiring_qty
 		from `tabItem` i
-		where {" and ".join(conditions)}
+		where i.disabled = 0 and i.is_stock_item = 1 and i.item_group in %(groups)s
+			and (%(name)s is null or i.name = %(name)s)
+			and (%(search)s is null or i.item_name like %(search)s or i.name like %(search)s)
+			and (%(category)s is null or i.item_group = %(category)s)
 		order by i.item_name
 		""",
 		values,
@@ -276,7 +274,12 @@ def _with_status(row):
 
 
 @frappe.whitelist()
-def medicines(search=None, category=None, status=None, expiry_before=None):
+def medicines(
+	search: str | None = None,
+	category: str | None = None,
+	status: str | None = None,
+	expiry_before: str | None = None,
+):
 	"""Medicine list with stock, minimum level, nearest expiry and a status."""
 	_require_staff()
 	rows = [_with_status(r) for r in _medicine_rows(search, category)]
@@ -291,7 +294,7 @@ def medicines(search=None, category=None, status=None, expiry_before=None):
 
 
 @frappe.whitelist()
-def medicine(code):
+def medicine(code: str):
 	"""One medicine with its batches and latest movements."""
 	_require_staff()
 	rows = _medicine_rows(name=code)
@@ -314,19 +317,19 @@ def medicine(code):
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
 def save_medicine(
-	name,
-	category,
-	unit,
-	form=None,
-	strength=None,
-	location=None,
-	minimum=0,
-	code=None,
-	qty=0,
-	price=0,
-	date=None,
-	expiry=None,
-	lot=None,
+	name: str,
+	category: str,
+	unit: str,
+	form: str | None = None,
+	strength: str | None = None,
+	location: str | None = None,
+	minimum: int | float | str = 0,
+	code: str | None = None,
+	qty: int | float | str = 0,
+	price: int | float | str = 0,
+	date: str | None = None,
+	expiry: str | None = None,
+	lot: str | int | None = None,
 ):
 	"""Create a medicine, or update one when `code` is given. Optionally receives its first stock."""
 	_require_staff()
@@ -413,7 +416,7 @@ def save_medicine(
 
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
-def delete_medicine(code):
+def delete_medicine(code: str):
 	"""Remove a medicine from the list (pharmacy staff and administrators).
 
 	A medicine that still has stock cannot be removed. One that was never used is deleted. One with
@@ -458,7 +461,15 @@ def _submit(doc):
 
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
-def add_stock(medicine, qty, price=0, date=None, expiry=None, lot=None, client_id=None):
+def add_stock(
+	medicine: str,
+	qty: int | float | str,
+	price: int | float | str = 0,
+	date: str | None = None,
+	expiry: str | None = None,
+	lot: str | int | None = None,
+	client_id: str | None = None,
+):
 	"""Record a delivery: one batch with its expiry date, added to the pharmacy store."""
 	_require_staff()
 	if done := _existing("Stock Entry", client_id):
@@ -564,7 +575,14 @@ def _allocate(medicine, qty, expired):
 
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
-def give_out(medicine, qty, reason, recipient=None, date=None, client_id=None):
+def give_out(
+	medicine: str,
+	qty: int | float | str,
+	reason: str,
+	recipient: str | None = None,
+	date: str | None = None,
+	client_id: str | None = None,
+):
 	"""Record stock leaving the store. Valid (unexpired) batches with the earliest expiry go first."""
 	_require_staff()
 	if done := _existing("Stock Entry", client_id):
@@ -610,7 +628,13 @@ def give_out(medicine, qty, reason, recipient=None, date=None, client_id=None):
 
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
-def request_stock(medicine, qty, urgency="Routine", reason=None, client_id=None):
+def request_stock(
+	medicine: str,
+	qty: int | float | str,
+	urgency: str = "Routine",
+	reason: str | None = None,
+	client_id: str | None = None,
+):
 	"""Ask for medicine to be ordered. The request waits for a pharmacy administrator."""
 	_require_staff()
 	if done := _existing("Material Request", client_id):
@@ -657,7 +681,7 @@ def _request_status(r):
 
 
 @frappe.whitelist()
-def requests(status=None, limit=100):
+def requests(status: str | None = None, limit: int | str = 100):
 	_require_staff()
 	rows = frappe.db.sql(
 		"""
@@ -685,7 +709,7 @@ def requests(status=None, limit=100):
 
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=True)
-def decide_request(name, action, note=None):
+def decide_request(name: str, action: str, note: str | None = None):
 	"""Approve or reject a pending request (administrators only)."""
 	_require_admin()
 	mr = frappe.get_doc("Material Request", name)
@@ -706,31 +730,18 @@ def decide_request(name, action, note=None):
 
 
 def _movements(medicine=None, from_date=None, to_date=None, kind=None, limit=200):
-	# a cancelled stock entry keeps its original row (marked cancelled); its reversal row is left out
-	conditions, values = (
-		[
-			"sle.warehouse = %(wh)s",
-			"sle.voucher_type = 'Stock Entry'",
-			"""(sle.is_cancelled = 0 or (se.docstatus = 2 and (
-			(se.stock_entry_type = 'Material Issue' and sle.actual_qty < 0) or (se.stock_entry_type <> 'Material Issue' and sle.actual_qty > 0))))""",
-		],
-		{"wh": _warehouse(), "limit": cint(limit)},
-	)
-	if medicine:
-		conditions.append("sle.item_code = %(medicine)s")
-		values["medicine"] = medicine
-	if from_date:
-		conditions.append("sle.posting_date >= %(from)s")
-		values["from"] = from_date
-	if to_date:
-		conditions.append("sle.posting_date <= %(to)s")
-		values["to"] = to_date
-	if kind == "in":
-		conditions.append("sle.actual_qty > 0")
-	elif kind == "out":
-		conditions.append("sle.actual_qty < 0")
+	# a cancelled stock entry keeps its original row (marked cancelled); its reversal row is left out.
+	# Optional filters are passed as NULL when unused, so the query text never changes.
+	values = {
+		"wh": _warehouse(),
+		"limit": cint(limit),
+		"medicine": medicine or None,
+		"from_date": from_date or None,
+		"to_date": to_date or None,
+		"kind": kind if kind in ("in", "out") else None,
+	}
 	rows = frappe.db.sql(
-		f"""
+		"""
 		select sle.posting_date as date, sle.creation, sle.item_code as medicine, i.item_name as medicine_name,
 			sle.actual_qty as qty, sle.stock_uom as unit, sle.batch_no as batch, sle.voucher_no as entry, se.owner,
 			se.custom_reason as reason, se.custom_recipient as recipient, se.stock_entry_type as type, se.docstatus as se_status,
@@ -738,7 +749,15 @@ def _movements(medicine=None, from_date=None, to_date=None, kind=None, limit=200
 		from `tabStock Ledger Entry` sle
 		join `tabStock Entry` se on se.name = sle.voucher_no
 		left join `tabItem` i on i.name = sle.item_code
-		where {" and ".join(conditions)}
+		where sle.warehouse = %(wh)s
+			and sle.voucher_type = 'Stock Entry'
+			and (sle.is_cancelled = 0 or (se.docstatus = 2 and (
+				(se.stock_entry_type = 'Material Issue' and sle.actual_qty < 0)
+				or (se.stock_entry_type <> 'Material Issue' and sle.actual_qty > 0))))
+			and (%(medicine)s is null or sle.item_code = %(medicine)s)
+			and (%(from_date)s is null or sle.posting_date >= %(from_date)s)
+			and (%(to_date)s is null or sle.posting_date <= %(to_date)s)
+			and (%(kind)s is null or (%(kind)s = 'in' and sle.actual_qty > 0) or (%(kind)s = 'out' and sle.actual_qty < 0))
 		order by sle.posting_date desc, sle.creation desc limit %(limit)s
 		""",
 		values,
@@ -771,13 +790,19 @@ def _movements(medicine=None, from_date=None, to_date=None, kind=None, limit=200
 
 
 @frappe.whitelist()
-def movements(medicine=None, from_date=None, to_date=None, kind=None, limit=200):
+def movements(
+	medicine: str | None = None,
+	from_date: str | None = None,
+	to_date: str | None = None,
+	kind: str | None = None,
+	limit: int | str = 200,
+):
 	_require_staff()
 	return _movements(medicine, from_date, to_date, kind, limit)
 
 
 @frappe.whitelist()
-def expiring(days=EXPIRY_WARNING_DAYS):
+def expiring(days: int | str = EXPIRY_WARNING_DAYS):
 	"""Batches with stock that expire within `days` days, and those already expired."""
 	_require_staff()
 	rows = frappe.db.sql(
@@ -961,7 +986,13 @@ def staff():
 
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=True)
-def save_staff(email, full_name, role="Pharmacy Staff", password=None, enabled=1):
+def save_staff(
+	email: str,
+	full_name: str,
+	role: str = "Pharmacy Staff",
+	password: str | None = None,
+	enabled: int | bool | str = 1,
+):
 	"""Create or update a pharmacy user. Administrators can only give the two pharmacy roles."""
 	_require_admin()
 	if role not in PHARMACY_ROLES:

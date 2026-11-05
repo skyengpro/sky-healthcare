@@ -9,7 +9,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* PharmaStock colour tokens (RGB channels, used through tailwind.config.js) */
+/* Healthcare Management colour tokens (RGB channels, used through tailwind.config.js) */
 :root {
   --ps-paper: 246 245 241;
   --ps-paper-deep: 239 237 231;

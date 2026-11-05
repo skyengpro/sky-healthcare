@@ -184,7 +184,8 @@ def after_install():
 		return  # finished by after_setup_wizard once the company exists
 	configure_stock()
 	create_warehouse()
-	frappe.db.commit()
+	# the setup wizard hook can run outside a request that commits; the store must exist when it ends
+	frappe.db.commit()  # nosemgrep
 
 
 def after_migrate():
@@ -227,15 +228,15 @@ def erpnext_ready():
 	return bool(frappe.db.exists("Item Group", "All Item Groups") and default_company())
 
 
-def after_setup_wizard(args=None):
+def after_setup_wizard(args=None):  # nosemgrep
 	"""On a site where the app was installed before the setup wizard, finish the setup now."""
 	try:
 		after_install()
 	except frappe.ValidationError:
 		# e.g. the new company has no Default Inventory Account yet: never block the setup wizard on it
-		frappe.log_error("PharmaStock setup after the wizard")
+		frappe.log_error("Healthcare Management setup after the wizard")
 		print(
-			"PharmaStock: setup could not finish inside the wizard. After it, run: "
+			"Healthcare Management: setup could not finish inside the wizard. After it, run: "
 			"bench --site <site> execute sky_healthcare.setup.install.after_install"
 		)
 
@@ -297,7 +298,7 @@ def create_warehouse(company=None):
 	):
 		# stock entries would fail; this is an accounting decision, so it is reported, not changed
 		print(
-			f"PharmaStock: company {company} uses perpetual inventory without a Default Inventory Account. "
+			f"Healthcare Management: company {company} uses perpetual inventory without a Default Inventory Account. "
 			"Set one in the Company, or disable perpetual inventory, before recording stock."
 		)
 	abbr = frappe.db.get_value("Company", company, "abbr")

@@ -1,4 +1,4 @@
-"""Smoke test of the PharmaStock API against a running site.
+"""Smoke test of the Healthcare Management API against a running site.
 
 Usage: python3 tests/api_smoke.py http://localhost:8088 <staff-email> <staff-pw> <admin-email> <admin-pw>
 Creates a test medicine "ZZ Test Medicine <random>" and moves stock in and out.

@@ -1,5 +1,5 @@
 // Renders the PWA icons and favicon from the SVG mark. Run: npm run icons
-// (the wordmark logo.png is rendered with the real fonts by scripts/wordmark.html in a browser)
+// (the wordmark docs/logo.png is rendered with the real fonts by scripts/wordmark.html in a browser)
 import sharp from 'sharp'
 import fs from 'fs'
 

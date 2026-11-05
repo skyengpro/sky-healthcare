@@ -2,7 +2,7 @@
   "name": "sky_healthcare",
   "version": "1.0.0",
   "private": true,
-  "description": "Builds the PharmaStock frontend (frontend/) into sky_healthcare/public/frontend",
+  "description": "Builds the Healthcare Management frontend (frontend/) into sky_healthcare/public/frontend",
   "scripts": {
     "postinstall": "cd frontend && npm ci",
     "build": "cd frontend && npm run build"

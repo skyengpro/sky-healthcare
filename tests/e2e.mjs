@@ -1,4 +1,4 @@
-// End-to-end test of the PharmaStock PWA in headless Chrome.
+// End-to-end test of the Healthcare Management PWA in headless Chrome.
 //
 // Usage: node tests/e2e.mjs <site-url> <staff-email> <staff-pw> <admin-email> <admin-pw> [screenshot-dir]
 // Needs `puppeteer-core` and Google Chrome. Creates a medicine called "E2E Ceftriaxone <random>".

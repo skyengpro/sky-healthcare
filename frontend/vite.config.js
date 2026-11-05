@@ -29,9 +29,9 @@ export default defineConfig({
       includeAssets: ['favicon.png', 'apple-touch-icon.png', 'logo-mark.svg'],
       manifest: {
         id: '/pharmacy/',
-        name: 'Pharmastock',
-        short_name: 'Pharmastock',
-        description: 'Medicine stock for health centers',
+        name: 'Healthcare Management',
+        short_name: 'Healthcare',
+        description: 'Medicine stock and patient care for health centers',
         start_url: '/pharmacy/',
         scope: '/pharmacy/',
         display: 'standalone',

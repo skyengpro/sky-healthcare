@@ -1,0 +1,55 @@
+{
+	"company": {
+		"name": "Centre de Santé Exemple",
+		"abbr": "CSE",
+		"country": "Cameroon",
+		"currency": "XAF",
+		"timezone": "Africa/Douala",
+		"language": "English",
+		"app_language": "fr",
+		"date_format": "dd-mm-yyyy"
+	},
+	"admin_user": {
+		"email": "it@example.cm",
+		"full_name": "IT Administrator"
+	},
+	"users": [
+		{ "email": "manager@example.cm", "full_name": "Clinic Manager", "role": "admin", "language": "fr" },
+		{ "email": "nurse@example.cm", "full_name": "Head Nurse", "role": "staff", "language": "fr" }
+	],
+	"medicines": [
+		{
+			"name": "Paracetamol 500mg",
+			"category": "Analgesic",
+			"unit": "Tablet",
+			"form": "Tablet",
+			"strength": "500mg",
+			"minimum": 100,
+			"stock": { "qty": 500, "expiry": "2027-12-31", "lot": "OPENING" }
+		},
+		{
+			"name": "Povidone iodine 10%",
+			"category": "Antiseptic",
+			"unit": "Bottle",
+			"form": "Other",
+			"strength": "10%",
+			"minimum": 5
+		},
+		{ "name": "Sterile gauze", "category": "Other Medicine", "unit": "Pack", "form": "Other", "minimum": 20 }
+	],
+	"treatment_types": [
+		{
+			"name": "Wound dressing",
+			"description": "Clean the wound and cover it",
+			"medicines": [
+				{ "medicine": "Povidone iodine 10%", "qty": 1 },
+				{ "medicine": "Sterile gauze", "qty": 2 }
+			]
+		},
+		{
+			"name": "Fever care",
+			"description": "Paracetamol for a feverish patient",
+			"medicines": [{ "medicine": "Paracetamol 500mg", "qty": 2 }]
+		}
+	]
+}

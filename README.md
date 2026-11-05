@@ -1,10 +1,10 @@
-<p align="center"><img src="docs/logo.png" alt="PharmaStock" width="320"></p>
+<p align="center"><img src="docs/logo.png" alt="Healthcare Management" width="420"></p>
 
 # Sky Healthcare
 
 SkyEngPro healthcare extensions for Frappe, ERPNext and Frappe Health (version 16).
 
-The app ships **PharmaStock**: medicine stock and patient care for health centers, as an installable
+The app ships **Healthcare Management**: medicine stock and patient care for health centers, as an installable
 web app (PWA) at `/pharmacy`. ERPNext Stock and Frappe Health keep the records underneath. English and
 French, works offline for stock work.
 
@@ -92,6 +92,29 @@ then add the rest of the team on the **Staff** page of the app.
 
 On Frappe Cloud / Press: add this repository under the bench's **Apps** next to ERPNext and Healthcare,
 deploy, then install the app on the site.
+
+## Set up a site in one command
+
+After installing the apps, one command does every setup step: the ERPNext setup wizard (company,
+country, currency), roles, custom fields, medicine categories, units, dosage forms, dosages and
+durations, notifications, the Pharmacy store, local date format, no public sign-up, the users (each also
+gets a doctor profile), and optionally a starting list of medicines with their stock and the treatment
+types.
+
+1. Copy `sky_healthcare/setup/site-setup.example.json`, and fill in the company, the users, and
+   optionally the medicines and treatment types.
+2. Run it (the path may be relative to the bench folder):
+
+   ```bash
+   bench --site <site> execute sky_healthcare.setup.site.setup --kwargs "{'config': 'site-setup.json'}"
+   ```
+
+3. It prints what it did and the password of every new user (shown once). Send each person the link
+   `https://<site>/pharmacy` and their login.
+
+It is safe to run again: existing users, medicines and treatment types are kept, never duplicated or
+changed. Without `--kwargs` it only does the steps that need no choices (the setup wizard must then be
+done already).
 
 ## Develop
 

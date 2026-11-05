@@ -180,7 +180,7 @@ def sync_all_medications():
 		try:
 			sync_medication(code)
 		except Exception:
-			frappe.log_error(f"PharmaStock: could not sync Medication for {code}")
+			frappe.log_error(f"Healthcare Management: could not sync Medication for {code}")
 
 
 # ------------------------------------------------------------------ patients
@@ -199,32 +199,29 @@ def _patient_row(p):
 
 
 @frappe.whitelist()
-def patients(search=None):
+def patients(search: str | None = None):
 	"""Patients, most recent first, with their number of procedures and the date of the last one."""
 	_require_staff()
 	_require_health()
-	conditions, values = ["p.status = 'Active'"], {}
-	if search:
-		conditions.append("(p.patient_name like %(s)s or p.mobile like %(s)s or p.name like %(s)s)")
-		values["s"] = f"%{search}%"
 	rows = frappe.db.sql(
-		f"""
+		"""
 		select p.name, p.patient_name, p.first_name, p.last_name, p.sex, p.dob, p.mobile, p.blood_group, p.creation,
 			(select count(*) from `tabClinical Procedure` cp where cp.patient = p.name and cp.docstatus = 1) as procedures,
 			(select max(cp.start_date) from `tabClinical Procedure` cp where cp.patient = p.name and cp.docstatus = 1) as last_visit
 		from `tabPatient` p
-		where {" and ".join(conditions)}
+		where p.status = 'Active'
+			and (%(s)s is null or p.patient_name like %(s)s or p.mobile like %(s)s or p.name like %(s)s)
 		order by p.creation desc
 		limit 500
 		""",
-		values,
+		{"s": f"%{search}%" if search else None},
 		as_dict=True,
 	)
 	return [_patient_row(r) for r in rows]
 
 
 @frappe.whitelist()
-def patient(name):
+def patient(name: str):
 	_require_staff()
 	_require_health()
 	if not frappe.db.exists("Patient", name):
@@ -260,15 +257,15 @@ def patient(name):
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
 def save_patient(
-	first_name,
-	sex,
-	last_name=None,
-	dob=None,
-	mobile=None,
-	blood_group=None,
-	allergies=None,
-	medical_history=None,
-	name=None,
+	first_name: str,
+	sex: str,
+	last_name: str | None = None,
+	dob: str | None = None,
+	mobile: str | None = None,
+	blood_group: str | None = None,
+	allergies: str | None = None,
+	medical_history: str | None = None,
+	name: str | None = None,
 ):
 	"""Register a patient in Frappe Health, or update one when `name` is given."""
 	_require_health()
@@ -345,7 +342,7 @@ def _item_rows(parent, parenttype):
 
 
 @frappe.whitelist()
-def procedure_templates(include_disabled=0):
+def procedure_templates(include_disabled: int | bool | str = 0):
 	_require_staff()
 	_require_health()
 	filters = {} if cint(include_disabled) else {"disabled": 0}
@@ -367,7 +364,13 @@ def procedure_templates(include_disabled=0):
 
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
-def save_procedure_template(template, items, description=None, name=None, disabled=0):
+def save_procedure_template(
+	template: str,
+	items: list | str,
+	description: str | None = None,
+	name: str | None = None,
+	disabled: int | bool | str = 0,
+):
 	"""Create or edit a procedure template and the medicines it uses."""
 	_require_health()
 	template = (template or "").strip()
@@ -463,7 +466,7 @@ def _procedure_rows(filters, limit=100):
 
 
 @frappe.whitelist()
-def procedures(patient=None, status=None, limit=100):
+def procedures(patient: str | None = None, status: str | None = None, limit: int | str = 100):
 	"""Recorded procedures, newest first (cancelled ones included). status: planned | done | cancelled."""
 	_require_staff()
 	_require_health()
@@ -535,7 +538,14 @@ def _complete(cp):
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
 def record_procedure(
-	patient, template, items=None, date=None, notes=None, complete=1, client_id=None, service_request=None
+	patient: str,
+	template: str,
+	items: list | str | None = None,
+	date: str | None = None,
+	notes: str | None = None,
+	complete: int | bool | str = 1,
+	client_id: str | None = None,
+	service_request: str | None = None,
 ):
 	"""Record a procedure for a patient. With `complete`, its medicines leave the store right away."""
 	_require_health()
@@ -608,7 +618,7 @@ def record_procedure(
 
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
-def complete_procedure(name):
+def complete_procedure(name: str):
 	"""Finish a planned procedure: its medicines leave the store now."""
 	_require_health()
 	cp = frappe.get_doc("Clinical Procedure", name)
@@ -619,7 +629,7 @@ def complete_procedure(name):
 
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
-def cancel_procedure(name, reason=None):
+def cancel_procedure(name: str, reason: str | None = None):
 	"""Cancel a procedure (pharmacy staff and administrators).
 
 	A planned one is simply cancelled. A completed one needs a reason: its stock movement is cancelled
@@ -691,7 +701,7 @@ def sync_all_practitioners():
 		try:
 			sync_practitioner(user)
 		except Exception:
-			frappe.log_error(f"PharmaStock: could not create a practitioner for {user}")
+			frappe.log_error(f"Healthcare Management: could not create a practitioner for {user}")
 
 
 def _my_practitioner():
@@ -744,7 +754,7 @@ def _named(doctype, field, names):
 
 
 @frappe.whitelist()
-def suggestions(kind):
+def suggestions(kind: str):
 	"""Names already used for symptoms (kind=symptoms) or diagnoses (kind=diagnoses): helps typing."""
 	_require_staff()
 	_require_health()
@@ -823,17 +833,17 @@ def _save_vitals(doc, vitals, finish):
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
 def save_consultation(
-	patient,
-	name=None,
-	practitioner=None,
-	date=None,
-	symptoms=None,
-	diagnoses=None,
-	notes=None,
-	vitals=None,
-	prescriptions=None,
-	treatments=None,
-	finish=0,
+	patient: str,
+	name: str | None = None,
+	practitioner: str | None = None,
+	date: str | None = None,
+	symptoms: list | str | None = None,
+	diagnoses: list | str | None = None,
+	notes: str | None = None,
+	vitals: dict | str | None = None,
+	prescriptions: list | str | None = None,
+	treatments: list | str | None = None,
+	finish: int | bool | str = 0,
 ):
 	"""Save a consultation as a draft, or finish it (the doctor's orders are then created).
 
@@ -907,7 +917,7 @@ def _loads(value):
 
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
-def discard_consultation(name):
+def discard_consultation(name: str):
 	"""Delete a draft consultation. A finished one stays in the file."""
 	_require_health()
 	if frappe.db.get_value("Patient Encounter", name, "docstatus") != 0:
@@ -938,7 +948,7 @@ def _consultation_row(r):
 
 
 @frappe.whitelist()
-def consultations(patient=None, limit=100):
+def consultations(patient: str | None = None, limit: int | str = 100):
 	_require_staff()
 	_require_health()
 	filters = {"docstatus": ["<", 2]}
@@ -997,7 +1007,7 @@ def _vitals_rows(filters):
 
 
 @frappe.whitelist()
-def consultation(name):
+def consultation(name: str):
 	"""One consultation with everything the doctor wrote and ordered."""
 	_require_staff()
 	_require_health()
@@ -1064,7 +1074,7 @@ def consultation(name):
 
 
 @frappe.whitelist()
-def prescriptions(patient=None, limit=100):
+def prescriptions(patient: str | None = None, limit: int | str = 100):
 	"""Medicines a doctor prescribed (Medication Requests). They do not move stock."""
 	_require_staff()
 	_require_health()
@@ -1108,7 +1118,7 @@ def prescriptions(patient=None, limit=100):
 
 
 @frappe.whitelist()
-def treatments_requested(patient=None):
+def treatments_requested(patient: str | None = None):
 	"""Treatments a doctor asked for in a consultation and that nobody has recorded yet."""
 	_require_staff()
 	_require_health()

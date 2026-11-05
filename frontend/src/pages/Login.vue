@@ -8,9 +8,9 @@
       <div class="relative flex h-full flex-col justify-between gap-10 px-6 py-7 sm:px-10 lg:px-14 lg:py-12">
         <Logo inverted mark-class="size-11 rounded-[12px] ring-1 ring-white/20" />
         <div class="max-w-[400px] pb-2 lg:pb-0">
-          <p class="eyebrow mb-4 !text-[#b9dccb]">{{ t('Pharmacy space') }}</p>
+          <p class="eyebrow mb-4 !text-[#b9dccb]">{{ t('Health center space') }}</p>
           <h1 class="font-display text-[34px] leading-[1.08] sm:text-[44px] lg:text-[52px]">
-            {{ t('Every box on the shelf,') }} <em class="italic text-[#b9dccb]">{{ t('counted.') }}</em>
+            {{ t('Stock and patients,') }} <em class="italic text-[#b9dccb]">{{ t('in one place.') }}</em>
           </h1>
           <ul class="mt-9 hidden space-y-4 text-[15px] text-white/80 sm:block">
             <li v-for="f in features" :key="f.icon" class="flex items-center gap-3.5">
@@ -19,7 +19,7 @@
             </li>
           </ul>
         </div>
-        <p class="hidden text-[12.5px] text-white/50 lg:block">© {{ new Date().getFullYear() }} Pharmastock · {{ t('Made for health centers in Cameroon') }}</p>
+        <p class="hidden text-[12.5px] text-white/50 lg:block">© {{ new Date().getFullYear() }} Healthcare Management · {{ t('Made for health centers in Cameroon') }}</p>
       </div>
     </section>
 
@@ -34,7 +34,7 @@
       <div class="flex flex-1 items-start justify-center px-6 pb-16 pt-4 sm:items-center sm:pt-0">
         <form class="rise w-full max-w-[380px]" @submit.prevent="submit">
           <h2 class="font-display text-[44px] leading-none text-ink">{{ t('Sign in') }}</h2>
-          <p class="mt-3 text-[15px] text-ink-mute">{{ t('Log in to manage your medicine stock.') }}</p>
+          <p class="mt-3 text-[15px] text-ink-mute">{{ t('Log in to manage your health center.') }}</p>
 
           <div class="mt-9 space-y-5">
             <label class="block">
@@ -58,10 +58,10 @@
             </p>
             <Btn type="submit" variant="primary" size="lg" block :loading="loading" :label="t('Log in')" class="!mt-7" />
           </div>
-          <p class="mt-5 text-center text-[13px] text-ink-mute">{{ t('Forgot your password? Ask your pharmacy administrator.') }}</p>
+          <p class="mt-5 text-center text-[13px] text-ink-mute">{{ t('Forgot your password? Ask your administrator.') }}</p>
           <p class="mt-10 flex items-start gap-2 border-t border-line pt-5 text-[12px] leading-relaxed text-ink-mute">
             <span class="lucide-shield-check mt-px size-3.5 shrink-0 text-apo" />
-            {{ t('For pharmacy staff only. Every stock movement is recorded under your name.') }}
+            {{ t('For health center staff only. Every action is recorded under your name.') }}
           </p>
         </form>
       </div>
@@ -83,7 +83,8 @@ const show = ref(false)
 const error = ref('')
 const loading = ref(false)
 const features = [
-  { icon: 'lucide-package-check', text: 'Know what is on the shelf at any time' },
+  { icon: 'lucide-package-check', text: 'Know what is in stock at any time' },
+  { icon: 'lucide-stethoscope', text: 'Follow every patient, from consultation to treatment' },
   { icon: 'lucide-calendar-clock', text: 'See expiring medicines before it is too late' },
   { icon: 'lucide-wifi-off', text: 'Keeps working when the internet is down' },
 ]

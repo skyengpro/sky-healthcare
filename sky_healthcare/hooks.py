@@ -276,7 +276,7 @@ after_install = "sky_healthcare.setup.install.after_install"
 after_migrate = "sky_healthcare.setup.install.after_migrate"
 setup_wizard_complete = "sky_healthcare.setup.install.after_setup_wizard"
 
-# PharmaStock PWA, served at /pharmacy
+# Healthcare Management PWA, served at /pharmacy
 website_route_rules = [{"from_route": "/pharmacy/<path:app_path>", "to_route": "pharmacy"}]
 page_renderer = ["sky_healthcare.service_worker.ServiceWorkerPage"]
 role_home_page = {"Pharmacy Staff": "pharmacy", "Pharmacy Admin": "pharmacy"}
@@ -284,7 +284,7 @@ add_to_apps_screen = [
 	{
 		"name": "sky_healthcare",
 		"logo": "/assets/sky_healthcare/images/logo-mark.svg",
-		"title": "PharmaStock",
+		"title": "Healthcare Management",
 		"route": "/pharmacy",
 	}
 ]

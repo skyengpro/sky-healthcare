@@ -22,7 +22,8 @@ class ServiceWorkerPage(BaseRenderer):
 		path = frappe.get_app_path("sky_healthcare", "public", "frontend", "sw.js")
 		if not os.path.exists(path):
 			return self.build_response("", http_status_code=404)
-		with open(path) as f:
+		# fixed path inside the app (no user input)
+		with open(path) as f:  # nosemgrep
 			body = f.read()
 		self.path = SW_PATH  # sets the javascript content type
 		return self.build_response(
