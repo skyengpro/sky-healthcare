@@ -27,7 +27,8 @@ import { computed, reactive, ref, watch } from 'vue'
 import { ErrorMessage, FormControl, toast } from 'frappe-ui'
 import Btn from './Btn.vue'
 import MedicineRows from './MedicineRows.vue'
-import { get, post } from '@/api'
+import { get, write } from '@/api'
+import { saved } from '@/offline/notify'
 import { t } from '@/i18n'
 import { newRow } from '@/care'
 import { ui, changed, H } from '@/ui'
@@ -57,10 +58,11 @@ async function save() {
   if (items.some((r) => !(Number(r.qty) > 0))) return (error.value = t('Please enter a quantity above 0.'))
   saving.value = true
   try {
-    await post(H('save_procedure_template'), { name: ui.template.name || undefined, template: form.template, description: form.description,
-      disabled: form.disabled ? 1 : 0, items: items.map((r) => ({ medicine: r.medicine, qty: Number(r.qty) })) })
+    const res = await write(H('save_procedure_template'), { name: ui.template.name || undefined, template: form.template, description: form.description,
+      disabled: form.disabled ? 1 : 0, items: items.map((r) => ({ medicine: r.medicine, qty: Number(r.qty) })) }, editing.value ? t('Edit treatment type') : t('New treatment type'),
+      { creates: editing.value ? undefined : 'template', summary: form.template })
     ui.template.open = false
-    toast.success(editing.value ? t('Treatment type updated') : t('Treatment type created'), { description: form.template })
+    saved(res, editing.value ? t('Treatment type updated') : t('Treatment type created'), form.template)
     changed()
   } catch (e) {
     error.value = e.message

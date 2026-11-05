@@ -216,4 +216,14 @@ fails(
 )
 admin.post("delete_category", {"name": cat})
 check("an administrator can delete an unused category", cat not in staff.get("boot")["options"]["categories"])
+mcid = str(uuid.uuid4())
+ma = {
+	"name": f"ZZ Retry Med {mcid[:5]}",
+	"category": "Analgesic",
+	"unit": "Tablet",
+	"minimum": 5,
+	"client_id": mcid,
+}
+m1, m2 = staff.post("save_medicine", ma), staff.post("save_medicine", ma)
+check("a medicine sent twice is created once", m1["code"] == m2["code"])
 print(f"\n{ok} checks passed")

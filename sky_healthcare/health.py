@@ -77,11 +77,15 @@ def _ensure(doctype, name, **fields):
 # ------------------------------------------------------------------ medicine <-> medication
 
 
-def _parse_strength(text):
-	"""'500mg' -> (500.0, 'mg'). Anything else -> (0, 'mg'), the text stays on the Item."""
+def _parse_strength(text, fallback_uom="mg"):
+	"""'500mg' -> (500.0, 'mg'). No strength written -> (0, the medicine's own unit, e.g. 'Tablet').
+
+	Frappe Health requires a strength and a unit on every Medication; with no strength the unit the
+	pharmacy counts in is shown, instead of an unrelated "mg".
+	"""
 	m = re.match(r"^\s*([\d.,]+)\s*([a-zA-Zµ%]+)?", text or "")
 	if not m:
-		return 0, _ensure("UOM", "mg", uom_name="mg", enabled=1)
+		return 0, _ensure("UOM", fallback_uom, uom_name=fallback_uom, enabled=1)
 	value = flt(m.group(1).replace(",", "."))
 	unit = STRENGTH_UNITS.get((m.group(2) or "mg").lower(), "mg")
 	return value, _ensure("UOM", unit, uom_name=unit, enabled=1)
@@ -105,7 +109,7 @@ def sync_medication(code):
 		["item_name", "item_group", "custom_dosage_form", "custom_strength", "stock_uom", "disabled"],
 		as_dict=True,
 	)
-	strength, strength_uom = _parse_strength(item.custom_strength)
+	strength, strength_uom = _parse_strength(item.custom_strength, item.stock_uom or "mg")
 	fields = {
 		"generic_name": item.item_name,
 		"medication_class": _ensure("Medication Class", item.item_group, medication_class=item.item_group),
@@ -266,9 +270,12 @@ def save_patient(
 	allergies: str | None = None,
 	medical_history: str | None = None,
 	name: str | None = None,
+	client_id: str | None = None,
 ):
 	"""Register a patient in Frappe Health, or update one when `name` is given."""
 	_require_health()
+	if not name and (done := _by_client_id("Patient", client_id)):
+		return {"name": done, "patient_name": frappe.db.get_value("Patient", done, "patient_name")}
 	first_name = (first_name or "").strip()
 	if not first_name:
 		frappe.throw(_("Please enter the patient's first name"))
@@ -293,7 +300,9 @@ def save_patient(
 		doc.update(fields)
 		doc.save(ignore_permissions=True)
 	else:
-		doc = frappe.get_doc({"doctype": "Patient", "owner": _owner(), **fields})
+		doc = frappe.get_doc(
+			{"doctype": "Patient", "owner": _owner(), "custom_client_id": client_id, **fields}
+		)
 		doc.insert(ignore_permissions=True)
 		_keep_owner(doc)
 	return {"name": doc.name, "patient_name": doc.patient_name}
@@ -362,6 +371,12 @@ def procedure_templates(include_disabled: int | bool | str = 0):
 	return rows
 
 
+def _by_client_id(doctype, client_id):
+	"""A record this device already sent (a write is sent again when the answer was lost)."""
+	if client_id:
+		return frappe.db.get_value(doctype, {"custom_client_id": client_id}, "name")
+
+
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
 def save_procedure_template(
@@ -370,9 +385,12 @@ def save_procedure_template(
 	description: str | None = None,
 	name: str | None = None,
 	disabled: int | bool | str = 0,
+	client_id: str | None = None,
 ):
 	"""Create or edit a procedure template and the medicines it uses."""
 	_require_health()
+	if not name and (done := _by_client_id("Clinical Procedure Template", client_id)):
+		return {"name": done}
 	template = (template or "").strip()
 	if not template:
 		frappe.throw(_("Please enter the name of the treatment type"))
@@ -405,6 +423,7 @@ def save_procedure_template(
 		{
 			"doctype": "Clinical Procedure Template",
 			"owner": _owner(),
+			"custom_client_id": client_id,
 			"template": template,
 			"item_code": item_code,
 			"item_group": group,
@@ -622,6 +641,8 @@ def complete_procedure(name: str):
 	"""Finish a planned procedure: its medicines leave the store now."""
 	_require_health()
 	cp = frappe.get_doc("Clinical Procedure", name)
+	if cp.docstatus == 1 and cp.status == "Completed":
+		return {"name": cp.name, "stock_entry": None}  # already done (the first answer was lost)
 	if cp.docstatus != 1 or cp.status == "Cancelled":
 		frappe.throw(_("This treatment was cancelled"))
 	if cp.status != "Completed":  # it happens today, whatever day it was planned for
@@ -642,7 +663,7 @@ def cancel_procedure(name: str, reason: str | None = None):
 	_require_health()
 	cp = frappe.get_doc("Clinical Procedure", name)
 	if cp.docstatus == 2:
-		frappe.throw(_("This treatment is already cancelled"))
+		return {"name": cp.name, "stock_returned": False}  # already cancelled
 	reason = (reason or "").strip()
 	completed = cp.status == "Completed"
 	if completed and not reason:
@@ -847,6 +868,7 @@ def save_consultation(
 	prescriptions: list | str | None = None,
 	treatments: list | str | None = None,
 	finish: int | bool | str = 0,
+	client_id: str | None = None,
 ):
 	"""Save a consultation as a draft, or finish it (the doctor's orders are then created).
 
@@ -854,6 +876,13 @@ def save_consultation(
 	treatment. A finished consultation cannot be edited.
 	"""
 	_require_health()
+	if not name and (done := _by_client_id("Patient Encounter", client_id)):
+		return {
+			"name": done,
+			"status": "done" if frappe.db.get_value("Patient Encounter", done, "docstatus") == 1 else "draft",
+		}
+	if name and cint(finish) and frappe.db.get_value("Patient Encounter", name, "docstatus") == 1:
+		return {"name": name, "status": "done"}  # finished already (the first answer was lost)
 	symptoms, diagnoses, prescriptions, treatments = [
 		_loads(x) for x in (symptoms, diagnoses, prescriptions, treatments)
 	]
@@ -895,7 +924,13 @@ def save_consultation(
 		doc.update(fields)
 	else:
 		doc = frappe.get_doc(
-			{"doctype": "Patient Encounter", "owner": _owner(), "encounter_time": nowtime_str(), **fields}
+			{
+				"doctype": "Patient Encounter",
+				"owner": _owner(),
+				"encounter_time": nowtime_str(),
+				"custom_client_id": client_id,
+				**fields,
+			}
 		)
 	for table, value in rows.items():
 		doc.set(table, value)
@@ -982,7 +1017,10 @@ def _loads(value):
 def discard_consultation(name: str):
 	"""Delete a draft consultation. A finished one stays in the file."""
 	_require_health()
-	if frappe.db.get_value("Patient Encounter", name, "docstatus") != 0:
+	status = frappe.db.get_value("Patient Encounter", name, "docstatus")
+	if status is None:
+		return {"name": name}  # already gone
+	if status != 0:
 		frappe.throw(_("A finished consultation cannot be deleted"))
 	for vs in frappe.get_all("Vital Signs", filters={"encounter": name, "docstatus": 0}, pluck="name"):
 		frappe.delete_doc("Vital Signs", vs, ignore_permissions=True)

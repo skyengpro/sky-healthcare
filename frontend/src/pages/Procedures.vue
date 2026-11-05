@@ -59,7 +59,8 @@ import { toast } from 'frappe-ui'
 import Btn from '@/components/Btn.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import EmptyState from '@/components/EmptyState.vue'
-import { get, post } from '@/api'
+import { get, write } from '@/api'
+import { saved } from '@/offline/notify'
 import { t } from '@/i18n'
 import { num } from '@/format'
 import { ui, changed, H, openProcedure, openTemplate } from '@/ui'
@@ -72,9 +73,9 @@ const shownTemplates = computed(() => (showHidden.value || !activeTemplates.valu
 
 async function reactivate(tp) {
   try {
-    await post(H('save_procedure_template'), { name: tp.name, template: tp.template, description: tp.description, disabled: 0,
-      items: tp.items.map((i) => ({ medicine: i.medicine, qty: i.qty })) })
-    toast.success(t('Treatment type shown again'), { description: tp.template })
+    const res = await write(H('save_procedure_template'), { name: tp.name, template: tp.template, description: tp.description, disabled: 0,
+      items: tp.items.map((i) => ({ medicine: i.medicine, qty: i.qty })) }, t('Edit treatment type'), { summary: tp.template })
+    saved(res, t('Treatment type shown again'), tp.template)
     changed()
   } catch (e) {
     toast.error(e.message)

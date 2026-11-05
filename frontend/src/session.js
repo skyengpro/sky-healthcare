@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
-import { get, net, clearCache, flush } from './api'
+import { get, net, clearCache, flush, ready } from './api'
+import { prefetch } from './offline/prefetch'
 import { setLanguage } from './i18n'
 
 export const session = reactive({
@@ -15,6 +16,7 @@ export const session = reactive({
 })
 
 export async function loadSession() {
+  await ready
   try {
     const boot = await get('boot')
     if (boot?.user) {
@@ -29,8 +31,11 @@ export async function loadSession() {
         practitioner: boot.practitioner || null,
       })
       net.csrf = boot.csrf_token
+      net.user = boot.user.email || boot.user.name
+      net.authNeeded = false
       if (!localStorage.getItem('sky_healthcare.lang') && boot.user.language) setLanguage(boot.user.language)
       flush()
+      prefetch(session)
     } else {
       session.user = null
     }
@@ -51,13 +56,13 @@ export async function login(usr, pwd) {
     const json = await res.json().catch(() => ({}))
     throw new Error(res.status === 401 ? 'Wrong email or password.' : json.message || 'Could not log in.')
   }
-  clearCache()
+  await clearCache()
   // the page is reloaded so the session cookie and a fresh CSRF token are used everywhere
   window.location.href = '/sky-healthcare/'
 }
 
 export async function logout() {
   await fetch('/api/method/logout', { method: 'POST', headers: { 'X-Frappe-CSRF-Token': net.csrf || '' } }).catch(() => {})
-  clearCache()
+  await clearCache()
   window.location.href = '/sky-healthcare/login'
 }

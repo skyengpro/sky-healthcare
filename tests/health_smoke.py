@@ -199,10 +199,10 @@ cancelled = staff.post(
 	"health.cancel_procedure", {"name": done["name"], "reason": "Recorded for the wrong patient"}
 )
 check("cancelled: stock returned", cancelled["stock_returned"] and stock() == 35)
-fails(
-	"cannot cancel twice",
-	lambda: staff.post("health.cancel_procedure", {"name": done["name"], "reason": "again"}),
-	"already cancelled",
+twice = staff.post("health.cancel_procedure", {"name": done["name"], "reason": "again"})
+check(
+	"cancelling twice changes nothing (stock is not returned again)",
+	not twice["stock_returned"] and stock() == 35,
 )
 detail = staff.get("health.patient", {"name": p["name"]})
 mine = next(x for x in detail["procedures"] if x["name"] == done["name"])
@@ -382,4 +382,44 @@ future = staff.post(
 	{"patient": p["name"], "template": tpl["name"], "complete": 0, "date": "2999-01-01"},
 )
 check("a planned treatment can be dated later", future["status"] == "Pending")
+# a change sent again (the first answer was lost) is recognised and never done twice
+import uuid as _uuid
+
+cid = str(_uuid.uuid4())
+pa = {"first_name": "Retry", "last_name": f"T{cid[:4]}", "sex": "Female", "client_id": cid}
+r1, r2 = staff.post("health.save_patient", pa), staff.post("health.save_patient", pa)
+check("a patient sent twice is created once", r1["name"] == r2["name"])
+tcid = str(_uuid.uuid4())
+ta = {"template": f"ZZ Retry {tcid[:4]}", "items": [], "client_id": tcid}
+t1, t2 = staff.post("health.save_procedure_template", ta), staff.post("health.save_procedure_template", ta)
+check("a treatment type sent twice is created once", t1["name"] == t2["name"])
+ccid = str(_uuid.uuid4())
+ca = {"patient": r1["name"], "notes": "retry", "finish": 1, "client_id": ccid}
+c1, c2 = staff.post("health.save_consultation", ca), staff.post("health.save_consultation", ca)
+check("a consultation sent twice is created once", c1["name"] == c2["name"] and c2["status"] == "done")
+again = staff.post(
+	"health.save_consultation", {"name": c1["name"], "patient": r1["name"], "notes": "retry", "finish": 1}
+)
+check("finishing a finished consultation again is accepted", again["status"] == "done")
+dcid = str(_uuid.uuid4())
+dr = staff.post("health.save_consultation", {"patient": r1["name"], "notes": "draft", "client_id": dcid})
+staff.post("health.discard_consultation", {"name": dr["name"]})
+check(
+	"discarding a draft twice is accepted",
+	staff.post("health.discard_consultation", {"name": dr["name"]})["name"] == dr["name"],
+)
+pc = staff.post(
+	"health.record_procedure",
+	{"patient": r1["name"], "template": tpl["name"], "complete": 0, "client_id": str(_uuid.uuid4())},
+)
+staff.post("health.complete_procedure", {"name": pc["name"]})
+check(
+	"completing a treatment twice is accepted",
+	staff.post("health.complete_procedure", {"name": pc["name"]})["name"] == pc["name"],
+)
+staff.post("health.cancel_procedure", {"name": pc["name"], "reason": "test"})
+check(
+	"cancelling a treatment twice is accepted",
+	staff.post("health.cancel_procedure", {"name": pc["name"], "reason": "test"})["name"] == pc["name"],
+)
 print(f"\n{ok} checks passed")

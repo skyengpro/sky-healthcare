@@ -44,7 +44,8 @@ import { ref } from 'vue'
 import { dialog, toast } from 'frappe-ui'
 import Btn from './Btn.vue'
 import StatusBadge from './StatusBadge.vue'
-import { post } from '@/api'
+import { write } from '@/api'
+import { saved } from '@/offline/notify'
 import { t } from '@/i18n'
 import { date, num } from '@/format'
 import { usedLine } from '@/care'
@@ -61,8 +62,8 @@ function complete() {
     onConfirm: async () => {
       busy.value = true
       try {
-        await post(H('complete_procedure'), { name: props.p.name })
-        toast.success(t('Treatment recorded'))
+        const res = await write(H('complete_procedure'), { name: props.p.name }, t('Mark as done'), { summary: props.p.procedure_template })
+        saved(res, t('Treatment recorded'))
         changed()
       } catch (e) {
         toast.error(e.message)

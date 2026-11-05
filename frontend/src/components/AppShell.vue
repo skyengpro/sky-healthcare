@@ -61,12 +61,12 @@
         <RouterLink to="/" class="md:hidden" :aria-label="t('Dashboard')"><Logo mark-class="size-9" /></RouterLink>
         <div class="flex-1" />
 
-        <button v-if="net.outbox.length" class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-medium"
+        <Transition name="pill"><button v-if="net.outbox.length" class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-medium"
           :class="failed ? 'bg-alert-soft text-alert' : 'bg-info-soft text-info'" @click="ui.sync.open = true">
           <span :class="net.syncing ? 'lucide-loader-circle animate-spin' : failed ? 'lucide-triangle-alert' : 'lucide-cloud-upload'" class="size-3.5" />
           <span class="hidden sm:inline">{{ failed ? t('{0} not sent', failed) : t('{0} to send', net.outbox.length) }}</span>
           <span class="sm:hidden">{{ net.outbox.length }}</span>
-        </button>
+        </button></Transition>
 
         <div class="hidden items-center rounded-full border border-line bg-card p-0.5 sm:flex" role="group" :aria-label="t('Language')">
           <button v-for="l in ['fr', 'en']" :key="l" class="rounded-full px-2.5 py-1 text-[11.5px] font-semibold uppercase tracking-wide transition"
@@ -119,10 +119,7 @@
         </div>
       </header>
 
-      <div v-if="!net.online" class="mx-4 mb-1 flex items-center gap-2.5 rounded-[14px] border border-warn/20 bg-warn-soft px-4 py-2.5 text-[13px] text-warn md:mx-8 lg:mx-10">
-        <span class="lucide-wifi-off size-4 shrink-0" />
-        {{ t('You are offline. You see the last saved data, and new stock movements are kept and sent later.') }}
-      </div>
+      <ConnectionBanner />
 
       <main class="mx-auto w-full max-w-[1200px] flex-1 px-4 pb-32 pt-3 md:px-8 md:pb-14 md:pt-5 lg:px-10">
         <slot />
@@ -174,11 +171,12 @@ import MedicineDialog from './MedicineDialog.vue'
 import AddStockDialog from './AddStockDialog.vue'
 import RequestDialog from './RequestDialog.vue'
 import SyncDialog from './SyncDialog.vue'
+import ConnectionBanner from './ConnectionBanner.vue'
 import PatientDialog from './PatientDialog.vue'
 import TemplateDialog from './TemplateDialog.vue'
 import ProcedureDialog from './ProcedureDialog.vue'
 import CancelProcedureDialog from './CancelProcedureDialog.vue'
-import { net } from '@/api'
+import { net, clearOutbox } from '@/api'
 import { alerts, alertCount, loadAlerts } from '@/alerts'
 import { lang, setLanguage, t } from '@/i18n'
 import { isDark, setTheme } from '@/theme'
@@ -247,8 +245,7 @@ function confirmLogout() {
     message: t('{0} change(s) on this device are not sent yet. If you log out now, they are lost.', net.outbox.length),
     confirmLabel: t('Log out'),
     onConfirm: () => {
-      net.outbox = []
-      localStorage.removeItem('sky_healthcare.outbox')
+      clearOutbox()
       logout()
     },
   })
@@ -257,3 +254,15 @@ function confirmLogout() {
 onMounted(loadAlerts)
 watch(() => ui.version, loadAlerts)
 </script>
+
+<style scoped>
+.pill-enter-active,
+.pill-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.pill-enter-from,
+.pill-leave-to {
+  opacity: 0;
+  transform: scale(0.9);
+}
+</style>

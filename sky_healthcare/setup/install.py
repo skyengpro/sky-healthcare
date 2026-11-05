@@ -120,6 +120,42 @@ CUSTOM_FIELDS = {
 
 # only when Frappe Health is installed: these link to its doctypes
 HEALTH_FIELDS = {
+	"Patient": [
+		{
+			"fieldname": "custom_client_id",
+			"label": "Client ID",
+			"fieldtype": "Data",
+			"hidden": 1,
+			"read_only": 1,
+			"no_copy": 1,
+			"search_index": 1,
+			"insert_after": "mobile",
+		},
+	],
+	"Patient Encounter": [
+		{
+			"fieldname": "custom_client_id",
+			"label": "Client ID",
+			"fieldtype": "Data",
+			"hidden": 1,
+			"read_only": 1,
+			"no_copy": 1,
+			"search_index": 1,
+			"insert_after": "encounter_comment",
+		},
+	],
+	"Clinical Procedure Template": [
+		{
+			"fieldname": "custom_client_id",
+			"label": "Client ID",
+			"fieldtype": "Data",
+			"hidden": 1,
+			"read_only": 1,
+			"no_copy": 1,
+			"search_index": 1,
+			"insert_after": "description",
+		},
+	],
 	"Item": [
 		{
 			"fieldname": "custom_medication",
@@ -129,6 +165,16 @@ HEALTH_FIELDS = {
 			"read_only": 1,
 			"no_copy": 1,
 			"insert_after": "custom_location",
+		},
+		{
+			"fieldname": "custom_client_id",
+			"label": "Client ID",
+			"fieldtype": "Data",
+			"hidden": 1,
+			"read_only": 1,
+			"no_copy": 1,
+			"search_index": 1,
+			"insert_after": "custom_medication",
 		},
 	],
 	"Stock Entry": [

@@ -377,9 +377,12 @@ def save_medicine(
 	date: str | None = None,
 	expiry: str | None = None,
 	lot: str | int | None = None,
+	client_id: str | None = None,
 ):
 	"""Create a medicine, or update one when `code` is given. Optionally receives its first stock."""
 	_require_staff()
+	if not code and (done := _existing("Item", client_id)):
+		return {"code": done}
 	name = (name or "").strip()
 	if not name:
 		frappe.throw(_("Please enter the medicine name"))
@@ -433,6 +436,7 @@ def save_medicine(
 		{
 			"doctype": "Item",
 			"owner": _owner(),
+			"custom_client_id": client_id,
 			"item_code": name,
 			"item_name": name,
 			"item_group": category,

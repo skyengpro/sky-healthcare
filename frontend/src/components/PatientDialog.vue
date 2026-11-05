@@ -34,7 +34,8 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ErrorMessage, FormControl, toast } from 'frappe-ui'
 import Btn from './Btn.vue'
-import { get, post } from '@/api'
+import { get, write } from '@/api'
+import { saved } from '@/offline/notify'
 import { t } from '@/i18n'
 import { today } from '@/format'
 import { blood } from '@/care'
@@ -65,9 +66,11 @@ async function save() {
   if (!form.sex) return (error.value = t("Please choose the patient's sex."))
   saving.value = true
   try {
-    const res = await post(H('save_patient'), { ...form, name: ui.patient.name || undefined })
+    const fullName = [form.first_name, form.last_name].filter(Boolean).join(' ')
+    const res = await write(H('save_patient'), { ...form, name: ui.patient.name || undefined }, editing.value ? t('Edit patient') : t('Register patient'),
+      { creates: editing.value ? undefined : 'patient', summary: fullName, stub: () => ({ patient_name: fullName }) })
     ui.patient.open = false
-    toast.success(editing.value ? t('Patient updated') : t('Patient registered'), { description: res.patient_name })
+    saved(res, editing.value ? t('Patient updated') : t('Patient registered'), res.patient_name)
     changed()
     if (!editing.value) router.push({ name: 'patient', params: { name: res.name } })
   } catch (e) {
