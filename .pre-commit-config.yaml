@@ -45,6 +45,10 @@ repos:
         exclude: |
             (?x)^(
                 sky_healthcare/public/dist/.*|
+                sky_healthcare/public/frontend/.*|
+                sky_healthcare/www/.*|
+                frontend/.*|
+                tests/.*|
                 .*node_modules.*|
                 .*boilerplate.*|
                 sky_healthcare/templates/includes/.*|
@@ -62,6 +66,10 @@ repos:
         exclude: |
             (?x)^(
                 sky_healthcare/public/dist/.*|
+                sky_healthcare/public/frontend/.*|
+                sky_healthcare/www/.*|
+                frontend/.*|
+                tests/.*|
                 cypress/.*|
                 .*node_modules.*|
                 .*boilerplate.*|

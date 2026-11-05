@@ -3,7 +3,7 @@ name = "sky_healthcare"
 authors = [
     { name = "SkyEngPro", email = "contact@skyengpro.com"}
 ]
-description = "SkyEngPro healthcare extensions"
+description = "SkyEngPro healthcare extensions: PharmaStock, medicine stock and patient care for health centers"
 requires-python = ">=3.14"
 readme = "README.md"
 dynamic = ["version"]

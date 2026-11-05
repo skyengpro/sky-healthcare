@@ -1,0 +1,28 @@
+{
+  "name": "sky_healthcare-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --base /pharmacy/",
+    "build": "vite build",
+    "icons": "node scripts/icons.mjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/figtree": "^5.1.2",
+    "@fontsource-variable/newsreader": "^5.1.1",
+    "@fontsource/ibm-plex-mono": "^5.1.1",
+    "frappe-ui": "^1.0.2",
+    "vue": "^3.5.13",
+    "vue-router": "^4.4.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "sharp": "^0.33.5",
+    "tailwindcss": "^3.4.17",
+    "vite": "^5.4.11",
+    "vite-plugin-pwa": "^0.21.1"
+  }
+}
