@@ -11,29 +11,29 @@ const SITE = process.env.SITE_URL || 'http://localhost:8088'
 export default defineConfig({
   plugins: [
     frappeui({
-      frontendRoute: '/pharmacy',
+      frontendRoute: '/sky-healthcare',
       frappeProxy: false,
       jinjaBootData: false,
       buildConfig: {
         outDir: '../sky_healthcare/public/frontend',
-        indexHtmlPath: '../sky_healthcare/www/pharmacy.html',
+        indexHtmlPath: '../sky_healthcare/www/sky-healthcare.html',
         baseUrl: BASE,
       },
     }),
     vue(),
     VitePWA({
-      // registered by hand from /pharmacy/sw.js, see src/pwa.js and sky_healthcare/service_worker.py
+      // registered by hand from /sky-healthcare/sw.js, see src/pwa.js and sky_healthcare/service_worker.py
       injectRegister: null,
       registerType: 'autoUpdate',
       filename: 'sw.js',
       includeAssets: ['favicon.png', 'apple-touch-icon.png', 'logo-mark.svg'],
       manifest: {
-        id: '/pharmacy/',
+        id: '/sky-healthcare/',
         name: 'Healthcare Management',
         short_name: 'Healthcare',
         description: 'Medicine stock and patient care for health centers',
-        start_url: '/pharmacy/',
-        scope: '/pharmacy/',
+        start_url: '/sky-healthcare/',
+        scope: '/sky-healthcare/',
         display: 'standalone',
         orientation: 'portrait',
         background_color: '#f6f5f1',
@@ -46,10 +46,10 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,svg,png,woff2,html}'],
-        // precache entries are relative; make them absolute so they resolve from /pharmacy/sw.js
+        // precache entries are relative; make them absolute so they resolve from /sky-healthcare/sw.js
         modifyURLPrefix: { '': BASE },
         navigateFallback: `${BASE}index.html`,
-        navigateFallbackAllowlist: [/^\/pharmacy(\/|$)/],
+        navigateFallbackAllowlist: [/^\/sky-healthcare(\/|$)/],
         cleanupOutdatedCaches: true,
         inlineWorkboxRuntime: true,
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,

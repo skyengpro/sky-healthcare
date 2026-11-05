@@ -21,7 +21,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory('/pharmacy/'),
+  history: createWebHistory('/sky-healthcare/'),
   routes,
   scrollBehavior: () => ({ top: 0 }),
 })

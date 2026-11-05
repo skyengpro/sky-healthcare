@@ -16,7 +16,7 @@
         <p v-if="!folded" class="eyebrow mb-2 px-3" :class="section.first ? '' : 'mt-5'">{{ t(section.label) }}</p>
         <div v-else-if="!section.first" class="mx-3 my-3 h-px bg-line" />
         <RouterLink v-for="item in section.items" :key="item.to" :to="item.to" custom v-slot="{ navigate, isActive, isExactActive }">
-          <a :href="'/pharmacy' + item.to" :title="folded ? t(item.label) : undefined"
+          <a :href="'/sky-healthcare' + item.to" :title="folded ? t(item.label) : undefined"
             class="group relative mb-0.5 flex items-center gap-3 rounded-[12px] py-2.5 text-[14px] transition"
             :class="[folded ? 'justify-center px-0' : 'px-3',
               (item.exact ? isExactActive : isActive) ? 'bg-paper-deep font-semibold text-ink' : 'font-medium text-ink-soft hover:bg-paper hover:text-ink']"
@@ -133,12 +133,12 @@
     <nav class="fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-30 mx-auto max-w-[480px] md:hidden">
       <div class="grid grid-cols-5 items-center rounded-[24px] border border-line bg-card/95 px-1 py-1 shadow-lift backdrop-blur">
         <RouterLink v-for="item in mobileNav" :key="item.to" :to="item.to" custom v-slot="{ navigate, isActive, isExactActive }">
-          <a v-if="item.primary" :href="'/pharmacy' + item.to" class="flex flex-col items-center" :aria-label="t(item.short)" @click="navigate">
+          <a v-if="item.primary" :href="'/sky-healthcare' + item.to" class="flex flex-col items-center" :aria-label="t(item.short)" @click="navigate">
             <span class="flex size-12 items-center justify-center rounded-full bg-ink text-on-ink shadow-card">
               <span :class="item.icon" class="size-5" />
             </span>
           </a>
-          <a v-else :href="'/pharmacy' + item.to" class="relative flex flex-col items-center gap-0.5 py-1.5"
+          <a v-else :href="'/sky-healthcare' + item.to" class="relative flex flex-col items-center gap-0.5 py-1.5"
             :class="(item.exact ? isExactActive : isActive) ? 'text-ink' : 'text-ink-mute'" @click="navigate">
             <span :class="item.icon" class="size-[19px]" />
             <span class="text-[10.5px] font-semibold">{{ t(item.short) }}</span>

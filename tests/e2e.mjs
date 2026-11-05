@@ -109,7 +109,7 @@ const api = (page, method, args = {}) =>
     return (await r.json()).message
   }, method, args)
 async function login(page, user, pw) {
-  await page.goto(`${SITE}/pharmacy/login`, { waitUntil: 'networkidle0' })
+  await page.goto(`${SITE}/sky-healthcare/login`, { waitUntil: 'networkidle0' })
   await fill(page, 'Email', user)
   await fill(page, 'Password', pw)
   await sleep(400)
@@ -141,9 +141,9 @@ const swScope = await staff.evaluate(() => Promise.race([
   navigator.serviceWorker.ready.then((r) => r.scope),
   new Promise((r) => setTimeout(() => r(null), 8000)),
 ]))
-await check('service worker installed for /pharmacy/', swScope?.endsWith('/pharmacy/'), swScope)
+await check('service worker installed for /sky-healthcare/', swScope?.endsWith('/sky-healthcare/'), swScope)
 const manifest = await staff.evaluate(async () => (await fetch(document.querySelector('link[rel=manifest]').href)).json())
-await check('web app manifest is valid', manifest.start_url === '/pharmacy/' && manifest.icons.length === 3)
+await check('web app manifest is valid', manifest.start_url === '/sky-healthcare/' && manifest.icons.length === 3)
 
 // add a medicine with starting stock
 await click(staff, 'Medicines', 'a')
@@ -216,19 +216,19 @@ await waitText(staff, 'Waiting for approval')
 await shot(staff, '06-requests')
 await check('staff request appears as waiting for approval', true)
 await check('staff has no Staff menu', !(await staff.evaluate(() => [...document.querySelectorAll('aside a')].some((a) => a.textContent.includes('Staff')))))
-await staff.goto(`${SITE}/pharmacy/staff`, { waitUntil: 'networkidle0' })
-await check('staff is redirected away from /pharmacy/staff', !staff.url().endsWith('/staff'))
+await staff.goto(`${SITE}/sky-healthcare/staff`, { waitUntil: 'networkidle0' })
+await check('staff is redirected away from /sky-healthcare/staff', !staff.url().endsWith('/staff'))
 const desk = await staff.goto(`${SITE}/desk`, { waitUntil: 'networkidle0' })
 await check('staff cannot open the ERPNext desk', !(await staff.evaluate(() => !!document.querySelector('.desk-sidebar, #page-desktop, .layout-main-section'))), staff.url())
 
 // reports
-await staff.goto(`${SITE}/pharmacy/reports`, { waitUntil: 'networkidle0' })
+await staff.goto(`${SITE}/sky-healthcare/reports`, { waitUntil: 'networkidle0' })
 await waitText(staff, 'rows')
 await shot(staff, '07-reports')
 await check('movements report lists the new medicine', (await text(staff)).includes(MED))
 
 // ---- offline ----------------------------------------------------------------------------
-await staff.goto(`${SITE}/pharmacy/give-out`, { waitUntil: 'networkidle0' })
+await staff.goto(`${SITE}/sky-healthcare/give-out`, { waitUntil: 'networkidle0' })
 await sleep(1500)
 await staff.setOfflineMode(true)
 await staff.reload({ waitUntil: 'domcontentloaded' })
@@ -253,7 +253,7 @@ await check('offline stock out is sent when back online (45 - 5 = 40), exactly o
 const admin = await newPage()
 current = admin
 await login(admin, A_USER, A_PW)
-await admin.goto(`${SITE}/pharmacy/requests?status=pending`, { waitUntil: 'networkidle0' })
+await admin.goto(`${SITE}/sky-healthcare/requests?status=pending`, { waitUntil: 'networkidle0' })
 await waitText(admin, MED)
 const card = await admin.waitForSelector(`::-p-xpath(//li[.//text()[normalize-space(.)=${JSON.stringify(MED)}]]//button[normalize-space(.)="Approve"])`)
 await card.click()
@@ -262,7 +262,7 @@ await click(admin, 'Approve', '*[@role="dialog"]//button')
 await sleep(1500)
 const reqs = await api(admin, 'requests')
 await check('admin approves the request', reqs.find((r) => r.medicine === MED)?.state === 'approved')
-await admin.goto(`${SITE}/pharmacy/staff`, { waitUntil: 'networkidle0' })
+await admin.goto(`${SITE}/sky-healthcare/staff`, { waitUntil: 'networkidle0' })
 await waitText(admin, 'Add a person')
 await shot(admin, '09-staff')
 await check('admin sees the staff page', (await text(admin)).includes('Grace Mbarga'))
@@ -273,10 +273,10 @@ current = mobile
 await login(mobile, S_USER, S_PW)
 await shot(mobile, '10-mobile-dashboard')
 await mobile.evaluate(() => localStorage.setItem('sky_healthcare.lang', 'fr'))
-await mobile.goto(`${SITE}/pharmacy/medicines`, { waitUntil: 'networkidle0' })
+await mobile.goto(`${SITE}/sky-healthcare/medicines`, { waitUntil: 'networkidle0' })
 await waitText(mobile, 'Médicaments')
 await shot(mobile, '11-mobile-medicines-fr')
-await mobile.goto(`${SITE}/pharmacy/give-out`, { waitUntil: 'networkidle0' })
+await mobile.goto(`${SITE}/sky-healthcare/give-out`, { waitUntil: 'networkidle0' })
 await waitText(mobile, 'Sortie de stock')
 await shot(mobile, '12-mobile-give-out-fr')
 await check('French translation and mobile layout render', true)

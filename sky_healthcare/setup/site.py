@@ -264,4 +264,4 @@ def _print(report):
 		print("\n  Users (passwords are shown once, keep them safe):")
 		for u in report["users"]:
 			print(f"    {u['email']:<36} {u['role']:<22} {'new' if u['new'] else 'kept':<5} {u['password']}")
-	print(f"\n  Open: {frappe.utils.get_url('/pharmacy')}\n")
+	print(f"\n  Open: {frappe.utils.get_url('/sky-healthcare')}\n")

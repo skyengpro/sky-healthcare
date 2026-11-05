@@ -53,11 +53,11 @@ export async function login(usr, pwd) {
   }
   clearCache()
   // the page is reloaded so the session cookie and a fresh CSRF token are used everywhere
-  window.location.href = '/pharmacy/'
+  window.location.href = '/sky-healthcare/'
 }
 
 export async function logout() {
   await fetch('/api/method/logout', { method: 'POST', headers: { 'X-Frappe-CSRF-Token': net.csrf || '' } }).catch(() => {})
   clearCache()
-  window.location.href = '/pharmacy/login'
+  window.location.href = '/sky-healthcare/login'
 }
