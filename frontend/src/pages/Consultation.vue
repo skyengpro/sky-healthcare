@@ -10,12 +10,13 @@
           </div>
         </template>
         <template v-if="!isNew" #actions>
+          <Btn v-if="readonly && !editing" icon="lucide-pencil" :label="t('Edit')" @click="editing = true" />
           <Btn icon="lucide-user-round" :label="t('Patient file')" :to="{ name: 'patient', params: { name: d.patient } }" />
         </template>
       </PageHeader>
 
       <!-- finished: read only -->
-      <div v-if="readonly" class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div v-if="readonly && !editing" class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div class="space-y-4">
           <Panel :title="t('What the doctor found')" padded>
             <div v-if="d.symptoms.length" class="mb-3"><p class="eyebrow mb-1.5">{{ t('Symptoms') }}</p>
@@ -94,7 +95,9 @@
           <TagInput v-model="form.diagnoses" :label="t('Diagnosis')" :suggestions="diagnosisHints" :placeholder="t('Type a diagnosis, press Enter')" />
         </div>
 
-        <div class="surface p-5 md:p-6">
+        <p v-if="editing" class="rounded-[12px] bg-paper-deep px-3.5 py-2.5 text-[13px] text-ink-mute">{{ t('The prescription and the treatments were already ordered, so they cannot be changed here.') }}</p>
+
+        <div v-if="!editing" class="surface p-5 md:p-6">
           <div class="mb-3 flex items-baseline justify-between"><h2 class="text-[15px] font-semibold text-ink">{{ t('Prescription') }}</h2>
             <span class="text-[12px] text-ink-mute">{{ t('Medicines the patient takes home') }}</span></div>
           <ul class="space-y-3">
@@ -116,7 +119,7 @@
             <span class="lucide-plus size-4" /> {{ t('Add a medicine') }}</button>
         </div>
 
-        <div class="surface p-5 md:p-6">
+        <div v-if="!editing" class="surface p-5 md:p-6">
           <div class="mb-3 flex items-baseline justify-between"><h2 class="text-[15px] font-semibold text-ink">{{ t('Treatments to do') }}</h2>
             <span class="text-[12px] text-ink-mute">{{ t('Care the nurse gives, like a dressing or an injection') }}</span></div>
           <p v-if="!templates.length" class="text-[13px] text-ink-mute">{{ t('No treatment type yet.') }} <RouterLink to="/procedures" class="font-medium text-apo hover:underline">{{ t('Create one') }}</RouterLink></p>
@@ -131,8 +134,12 @@
 
         <div class="fixed inset-x-0 bottom-[84px] z-20 border-t border-line bg-paper/95 px-4 py-3 backdrop-blur md:static md:inset-auto md:z-auto md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
           <div class="mx-auto flex max-w-[1200px] items-center gap-2 md:justify-end">
-            <Btn v-if="!isNew" variant="ghost" icon="lucide-trash-2" :label="t('Discard')" class="[&>span:last-child]:hidden sm:[&>span:last-child]:inline" @click="discard" />
-            <div class="flex flex-1 gap-2 md:flex-none">
+            <Btn v-if="!isNew && !editing" variant="ghost" icon="lucide-trash-2" :label="t('Discard')" class="[&>span:last-child]:hidden sm:[&>span:last-child]:inline" @click="discard" />
+            <div v-if="editing" class="flex flex-1 gap-2 md:flex-none">
+              <Btn class="flex-1 md:flex-none" :label="t('Cancel')" @click="cancelEdit" />
+              <Btn class="flex-1 md:flex-none" variant="primary" icon="lucide-check" :loading="saving === 'edit'" :label="t('Save changes')" @click="saveEdit" />
+            </div>
+            <div v-else class="flex flex-1 gap-2 md:flex-none">
               <Btn class="flex-1 md:flex-none" :label="t('Save draft')" :loading="saving === 'draft'" @click="save(false)" />
               <Btn class="flex-1 md:flex-none" variant="primary" icon="lucide-check" :loading="saving === 'finish'" @click="save(true)">
                 <span class="sm:hidden">{{ t('Finish') }}</span><span class="hidden sm:inline">{{ t('Finish consultation') }}</span>
@@ -192,6 +199,7 @@ const VITAL_FIELDS = [
 const blankVitals = () => Object.fromEntries(VITAL_FIELDS.map((v) => [v.key, '']))
 const form = reactive({ patient: null, practitioner: null, date: null, symptoms: [], diagnoses: [], notes: '', vitals: blankVitals(), prescriptions: [], treatments: [] })
 
+const editing = ref(false)
 const readonly = computed(() => !isNew.value && d.value?.state === 'done')
 const lockedPatient = computed(() => !!(form.patient && (!isNew.value || route.query.patient)))
 const backTo = computed(() => { const p = form.patient || route.query.patient; return p ? { name: 'patient', params: { name: p } } : '/patients' })
@@ -267,6 +275,28 @@ async function save(finish) {
   }
 }
 
+function cancelEdit() {
+  editing.value = false
+  load()
+}
+
+async function saveEdit() {
+  error.value = ''
+  if (!form.practitioner) return (error.value = t('Please choose the doctor.'))
+  saving.value = 'edit'
+  try {
+    await post(H('update_consultation'), { name: props.name, practitioner: form.practitioner, symptoms: form.symptoms, diagnoses: form.diagnoses, notes: form.notes, vitals: form.vitals })
+    toast.success(t('Consultation updated'))
+    editing.value = false
+    ui.version++
+    await load()
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    saving.value = ''
+  }
+}
+
 function discard() {
   dialog.danger({
     title: t('Discard this draft?'), message: t('Nothing has been ordered yet. The draft is deleted.'), confirmLabel: t('Discard'),
@@ -283,6 +313,6 @@ function discard() {
 }
 
 onMounted(load)
-watch(() => props.name, load)
-watch(() => ui.version, () => { if (readonly.value) load() })
+watch(() => props.name, () => { editing.value = false; load() })
+watch(() => ui.version, () => { if (readonly.value && !editing.value) load() })
 </script>

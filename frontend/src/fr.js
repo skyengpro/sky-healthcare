@@ -35,6 +35,11 @@ export default {
   'Approve or reject them.': 'Approuvez-les ou refusez-les.',
 
   // login
+  Add: 'Ajouter',
+  'New category': 'Nouvelle catégorie',
+  'Category name': 'Nom de la catégorie',
+  'Category added': 'Catégorie ajoutée',
+  'This category already exists': 'Cette catégorie existe déjà',
   'Health center space': 'Espace centre de santé',
   'Sign in': 'Connexion',
   'Stock and patients,': 'Stock et patients,',
@@ -226,6 +231,10 @@ export default {
   'Expiry date': 'Date d’expiration',
   Cancel: 'Annuler',
   'Save changes': 'Enregistrer',
+  'Go to': 'Aller à',
+  'Date planned': 'Date prévue',
+  'Consultation updated': 'Consultation mise à jour',
+  'The prescription and the treatments were already ordered, so they cannot be changed here.': 'L’ordonnance et les soins ont déjà été demandés, ils ne peuvent pas être modifiés ici.',
   'Add medicine': 'Ajouter le médicament',
   'Please enter the medicine name.': 'Veuillez saisir le nom du médicament.',
   'Please choose a category.': 'Veuillez choisir une catégorie.',

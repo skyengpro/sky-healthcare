@@ -195,4 +195,16 @@ check("dashboard counts", dash["counts"]["medicines"] >= 1 and len(dash["activit
 exp = staff.get("expiring", {"days": 3650})
 check("expiring report", any(r["medicine"] == name for r in exp))
 check("admin boot", admin.get("boot")["is_admin"] is True)
+cat = f"ZZ Category {uuid.uuid4().hex[:5]}"
+made = staff.post("add_category", {"name": f"  {cat}  "})
+check("a category can be added from the app", made["created"] and made["name"] == cat)
+check("the new category is offered", cat in staff.get("boot")["options"]["categories"])
+again = staff.post("add_category", {"name": cat.lower()})
+check("adding it again returns the same one", not again["created"] and again["name"] == cat)
+fails("a category needs a name", lambda: staff.post("add_category", {"name": "  "}), "name")
+fails(
+	"a name used elsewhere in ERPNext is refused",
+	lambda: staff.post("add_category", {"name": "Products"}),
+	"already exists",
+)
 print(f"\n{ok} checks passed")

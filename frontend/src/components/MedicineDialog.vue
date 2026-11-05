@@ -5,8 +5,20 @@
     <form class="grid grid-cols-2 items-start gap-x-3 gap-y-4 sm:gap-x-4" @submit.prevent="save">
       <FormControl variant="outline" v-model="form.name" class="col-span-2" :label="t('Medicine name')" required size="lg"
         :placeholder="t('e.g. Paracetamol 500mg')" />
-      <FormControl variant="outline" v-model="form.category" type="select" :options="opt(session.options.categories)" :label="t('Category')"
-        required size="lg" :placeholder="t('Choose…')" />
+      <div>
+        <FormControl variant="outline" v-model="form.category" type="select" :options="opt(session.options.categories)" :label="t('Category')"
+          required size="lg" :placeholder="t('Choose…')" />
+        <button v-if="!newCat.open" type="button" class="mt-1.5 inline-flex items-center gap-1 text-[12.5px] font-medium text-apo hover:underline"
+          @click="newCat.open = true">
+          <span class="lucide-plus size-3.5" />{{ t('New category') }}
+        </button>
+        <div v-else ref="catBox" class="mt-2 flex items-start gap-2">
+          <FormControl variant="outline" v-model="newCat.name" class="min-w-0 flex-1" :placeholder="t('Category name')"
+            @keydown.enter.prevent="addCategory" />
+          <Btn size="sm" variant="primary" :label="t('Add')" :loading="newCat.saving" @click="addCategory" />
+          <Btn size="sm" variant="ghost" :label="t('Cancel')" @click="newCat.open = false" />
+        </div>
+      </div>
       <FormControl variant="outline" v-model="form.form" type="select" :options="opt(session.options.forms)" :label="t('Dosage form')"
         size="lg" :placeholder="t('Choose…')" />
       <FormControl variant="outline" v-model="form.strength" :label="t('Strength')" size="lg" :placeholder="t('e.g. 500mg')" />
@@ -40,7 +52,7 @@
 
 <script setup>
 import Sheet from './Sheet.vue'
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ErrorMessage, FormControl, toast, dialog } from 'frappe-ui'
 import Btn from './Btn.vue'
@@ -57,18 +69,45 @@ const blank = () => ({ name: '', category: null, form: 'Tablet', strength: '', u
 const form = reactive(blank())
 const saving = ref(false)
 const error = ref('')
+const newCat = reactive({ open: false, name: '', saving: false })
+const catBox = ref(null)
+watch(() => newCat.open, async (open) => {
+  if (!open) return
+  await nextTick()
+  // the sheet restores focus to itself when its content changes, so focus after that
+  setTimeout(() => catBox.value?.querySelector('input')?.focus(), 80)
+})
 const opt = (list) => (list || []).map((v) => ({ label: t(v), value: v }))
 
 watch(() => ui.medicine.open, async (open) => {
   if (!open) return
   Object.assign(form, blank())
   error.value = ''
+  Object.assign(newCat, { open: false, name: '', saving: false })
   if (ui.medicine.code) {
     const m = await get('medicine', { code: ui.medicine.code })
     Object.assign(form, { name: m.name, category: m.category, form: m.form, strength: m.strength, unit: m.unit,
       minimum: m.minimum, location: m.location })
   }
 })
+
+async function addCategory() {
+  const name = newCat.name.trim()
+  if (!name) return
+  newCat.saving = true
+  try {
+    const r = await post('add_category', { name })
+    if (!session.options.categories.includes(r.name)) session.options.categories.push(r.name)
+    session.options.categories.sort((a, b) => a.localeCompare(b))
+    form.category = r.name
+    Object.assign(newCat, { open: false, name: '' })
+    toast.success(r.created ? t('Category added') : t('This category already exists'), { description: r.name })
+  } catch (e) {
+    toast.error(e.message)
+  } finally {
+    newCat.saving = false
+  }
+}
 
 async function save() {
   error.value = ''

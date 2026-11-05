@@ -29,13 +29,18 @@
       <MedicineRows v-if="form.template" v-model="form.items" :label="t('Medicines used')" :hint="t('Change the quantities if needed')" />
 
       <div class="grid grid-cols-2 items-end gap-3 sm:gap-4">
-        <FormControl variant="outline" v-model="form.date" type="date" format="D MMM YYYY" :label="t('Date')" size="lg" :max="today()"
+        <!-- done now: it happens today, the date cannot be changed. Planned: pick the day. -->
+        <div v-if="form.complete" class="col-span-2 sm:col-span-1">
+          <div class="mb-1.5 text-[13px] text-ink-soft">{{ t('Date') }}</div>
+          <div class="flex h-12 items-center rounded-[14px] border border-line bg-paper px-3.5 text-[14.5px] text-ink-soft">{{ t('Today') }} · {{ date(today(), { day: 'numeric', month: 'short', year: 'numeric' }) }}</div>
+        </div>
+        <FormControl v-else variant="outline" v-model="form.date" type="date" format="D MMM YYYY" :label="t('Date planned')" size="lg" :min="today()"
           class="col-span-2 sm:col-span-1" />
         <div class="col-span-2 sm:col-span-1">
           <div class="mb-1.5 text-[13px] text-ink-soft">{{ t('When') }}</div>
           <div class="grid grid-cols-2 gap-1 rounded-full border border-line bg-card p-1">
             <button type="button" class="rounded-full px-2 py-2 text-[13px] font-medium transition"
-              :class="form.complete ? 'bg-ink text-on-ink' : 'text-ink-mute hover:text-ink'" @click="form.complete = true">{{ t('Done now') }}</button>
+              :class="form.complete ? 'bg-ink text-on-ink' : 'text-ink-mute hover:text-ink'" @click="form.complete = true; form.date = today()">{{ t('Done now') }}</button>
             <button type="button" class="rounded-full px-2 py-2 text-[13px] font-medium transition"
               :class="!form.complete ? 'bg-info-soft text-info' : 'text-ink-mute hover:text-ink'" @click="form.complete = false">{{ t('Planned') }}</button>
           </div>
@@ -66,7 +71,7 @@ import MedicineRows from './MedicineRows.vue'
 import PatientPicker from './PatientPicker.vue'
 import { get, post } from '@/api'
 import { t } from '@/i18n'
-import { today } from '@/format'
+import { date, today } from '@/format'
 import { newRow } from '@/care'
 import { ui, changed, H, openPatient, openTemplate } from '@/ui'
 

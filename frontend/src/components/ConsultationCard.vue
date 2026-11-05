@@ -6,8 +6,8 @@
       <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
           <div class="min-w-0">
-            <h3 class="truncate text-[15px] font-semibold text-ink">{{ showPatient ? c.patient_name : date(c.encounter_date) }}</h3>
-            <p class="mt-0.5 text-[12.5px] text-ink-mute">{{ showPatient ? date(c.encounter_date) + ' · ' : '' }}{{ c.time }} · {{ c.practitioner_name }}</p>
+            <h3 class="truncate text-[15px] font-semibold text-ink">{{ showPatient ? c.patient_name : date(c.encounter_date) + (c.time ? ' · ' + c.time : '') }}</h3>
+            <p class="mt-0.5 text-[12.5px] text-ink-mute">{{ showPatient ? date(c.encounter_date) + (c.time ? ' · ' + c.time : '') + ' · ' : '' }}{{ c.practitioner_name }}</p>
           </div>
           <StatusBadge :status="c.state" />
         </div>

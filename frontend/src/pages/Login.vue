@@ -1,15 +1,16 @@
 <template>
-  <div class="min-h-screen bg-paper lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+  <!-- phone: everything fits the screen, no scrolling -->
+  <div class="flex h-[100dvh] flex-col overflow-hidden bg-paper lg:grid lg:h-auto lg:min-h-screen lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:overflow-visible">
     <!-- brand panel -->
-    <section class="relative overflow-hidden bg-[#173F33] text-white lg:min-h-screen">
+    <section class="relative shrink-0 overflow-hidden bg-[#173F33] text-white lg:min-h-screen">
       <div class="absolute inset-0 bg-[radial-gradient(120%_80%_at_0%_0%,#2c6c58_0%,transparent_60%),radial-gradient(90%_70%_at_100%_100%,#123329_0%,transparent_70%)]" />
       <BlisterArt class="pointer-events-none absolute -right-[210px] top-1/2 hidden h-[72%] -translate-y-1/2 rotate-[-12deg] xl:block xl:-right-[150px] 2xl:-right-[60px]" />
       <div class="absolute inset-y-0 left-0 hidden w-2/3 bg-gradient-to-r from-[#173F33] via-[#173F33]/80 to-transparent xl:block" />
-      <div class="relative flex h-full flex-col justify-between gap-10 px-6 py-7 sm:px-10 lg:px-14 lg:py-12">
-        <Logo inverted mark-class="size-11 rounded-[12px] ring-1 ring-white/20" />
-        <div class="max-w-[400px] pb-2 lg:pb-0">
-          <p class="eyebrow mb-4 !text-[#b9dccb]">{{ t('Health center space') }}</p>
-          <h1 class="font-display text-[34px] leading-[1.08] sm:text-[44px] lg:text-[52px]">
+      <div class="relative flex h-full flex-col justify-between gap-3 px-6 py-4 sm:gap-10 sm:px-10 sm:py-7 lg:px-14 lg:py-12">
+        <Logo inverted mark-class="size-9 rounded-[10px] ring-1 ring-white/20 sm:size-11 sm:rounded-[12px]" />
+        <div class="max-w-[400px] lg:pb-0">
+          <p class="eyebrow mb-4 hidden !text-[#b9dccb] sm:block">{{ t('Health center space') }}</p>
+          <h1 class="max-w-[340px] font-display text-[24px] leading-[1.1] sm:max-w-none sm:text-[44px] lg:max-w-[340px] lg:text-[52px] xl:max-w-[360px]">
             {{ t('Stock and patients,') }} <em class="italic text-[#b9dccb]">{{ t('in one place.') }}</em>
           </h1>
           <ul class="mt-9 hidden space-y-4 text-[15px] text-white/80 sm:block">
@@ -24,26 +25,26 @@
     </section>
 
     <!-- form -->
-    <section class="relative flex min-h-[70vh] flex-col lg:min-h-screen">
-      <div class="flex justify-end p-5 sm:p-7">
+    <section class="relative flex min-h-0 flex-1 flex-col lg:min-h-screen">
+      <div class="flex justify-end p-5 max-lg:absolute max-lg:right-0 max-lg:top-0 max-lg:p-3 sm:p-7">
         <div class="flex items-center rounded-full border border-line bg-card p-0.5" role="group" :aria-label="t('Language')">
           <button v-for="l in ['fr', 'en']" :key="l" class="rounded-full px-3 py-1 text-[11.5px] font-semibold uppercase tracking-wide transition"
             :class="lang === l ? 'bg-ink text-on-ink' : 'text-ink-mute hover:text-ink'" @click="setLanguage(l)">{{ l }}</button>
         </div>
       </div>
-      <div class="flex flex-1 items-start justify-center px-6 pb-16 pt-4 sm:items-center sm:pt-0">
+      <div class="flex flex-1 items-center justify-center px-6 py-3 sm:pb-16 sm:pt-0">
         <form class="rise w-full max-w-[380px]" @submit.prevent="submit">
-          <h2 class="font-display text-[44px] leading-none text-ink">{{ t('Sign in') }}</h2>
-          <p class="mt-3 text-[15px] text-ink-mute">{{ t('Log in to manage your health center.') }}</p>
+          <h2 class="font-display text-[34px] leading-none text-ink sm:text-[44px]">{{ t('Sign in') }}</h2>
+          <p class="mt-2 text-[14px] text-ink-mute sm:mt-3 sm:text-[15px]">{{ t('Log in to manage your health center.') }}</p>
 
-          <div class="mt-9 space-y-5">
+          <div class="mt-5 space-y-3.5 sm:mt-9 sm:space-y-5">
             <label class="block">
-              <span class="mb-2 block text-[13px] font-semibold text-ink">{{ t('Email') }}</span>
+              <span class="mb-1.5 block text-[13px] font-semibold text-ink">{{ t('Email') }}</span>
               <input v-model="email" type="email" autocomplete="username" required :placeholder="t('you@clinic.cm')"
                 class="h-12 w-full rounded-[12px] border border-line bg-card px-4 text-[15px] text-ink shadow-card outline-none transition placeholder:text-ink-faint focus:border-apo-mid focus:ring-4 focus:ring-apo/10" />
             </label>
             <label class="block">
-              <span class="mb-2 block text-[13px] font-semibold text-ink">{{ t('Password') }}</span>
+              <span class="mb-1.5 block text-[13px] font-semibold text-ink">{{ t('Password') }}</span>
               <span class="relative block">
                 <input v-model="password" :type="show ? 'text' : 'password'" autocomplete="current-password" required
                   class="h-12 w-full rounded-[12px] border border-line bg-card pl-4 pr-12 text-[15px] text-ink shadow-card outline-none transition focus:border-apo-mid focus:ring-4 focus:ring-apo/10" />
@@ -56,10 +57,10 @@
             <p v-if="error" class="flex items-center gap-2 rounded-[12px] bg-alert-soft px-3.5 py-2.5 text-[13px] text-alert">
               <span class="lucide-circle-alert size-4 shrink-0" />{{ error }}
             </p>
-            <Btn type="submit" variant="primary" size="lg" block :loading="loading" :label="t('Log in')" class="!mt-7" />
+            <Btn type="submit" variant="primary" size="lg" block :loading="loading" :label="t('Log in')" class="!mt-5 sm:!mt-7" />
           </div>
-          <p class="mt-5 text-center text-[13px] text-ink-mute">{{ t('Forgot your password? Ask your administrator.') }}</p>
-          <p class="mt-10 flex items-start gap-2 border-t border-line pt-5 text-[12px] leading-relaxed text-ink-mute">
+          <p class="mt-3 text-center text-[13px] text-ink-mute sm:mt-5">{{ t('Forgot your password? Ask your administrator.') }}</p>
+          <p class="mt-4 hidden items-start gap-2 border-t border-line pt-4 text-[12px] leading-relaxed text-ink-mute min-[400px]:flex sm:mt-10 sm:pt-5">
             <span class="lucide-shield-check mt-px size-3.5 shrink-0 text-apo" />
             {{ t('For health center staff only. Every action is recorded under your name.') }}
           </p>

@@ -46,7 +46,7 @@
                     <div class="text-[14px] font-semibold text-ink" :class="e.struck && 'line-through decoration-ink-faint'">{{ e.title }}</div>
                     <div class="mt-0.5 text-[12.5px] text-ink-mute">{{ e.sub }}</div>
                   </div>
-                  <div class="shrink-0 text-right text-[12px] text-ink-mute tabular">{{ date(e.date) }}</div>
+                  <div class="shrink-0 text-right text-[12px] text-ink-mute tabular">{{ date(e.date) }}<template v-if="e.time"> · {{ e.time }}</template></div>
                 </component>
               </li>
             </ol>
@@ -159,15 +159,15 @@ const timeline = computed(() => {
   const x = p.value
   const out = [
     ...x.consultations.map((c) => ({ key: `c${c.name}`, date: c.encounter_date, icon: 'lucide-notebook-pen', tone: 'bg-info-soft text-info', to: { name: 'consultation', params: { name: c.name } },
-      title: `${t('Consultation')} · ${c.state === 'draft' ? t('Draft') : (c.diagnoses[0] || c.symptoms[0] || '')}`.replace(/ · $/, ''), sub: `${c.time} · ${c.practitioner_name}` })),
+      title: `${t('Consultation')} · ${c.state === 'draft' ? t('Draft') : (c.diagnoses[0] || c.symptoms[0] || '')}`.replace(/ · $/, ''), sub: c.practitioner_name, time: c.time })),
     ...x.procedures.map((r) => ({ key: `p${r.name}`, date: r.start_date, icon: r.state === 'cancelled' ? 'lucide-undo-2' : 'lucide-stethoscope', tone: r.state === 'cancelled' ? 'bg-paper-deep text-ink-mute' : 'bg-apo-soft text-apo',
       struck: r.state === 'cancelled', title: `${t('Treatment')} · ${r.procedure_template}`, sub: r.state === 'cancelled' ? t('Cancelled') : (usedLine(r.items) || r.by) })),
     ...x.prescriptions.map((r) => ({ key: `m${r.name}`, date: r.order_date, icon: 'lucide-pill', tone: 'bg-apo-soft text-apo', title: `${t('Prescription')} · ${r.medicine_name}`,
       sub: `${dosageLabel(r.dosage)} · ${durationLabel(r.period)} · ${num(r.quantity)}` })),
-    ...x.vitals.map((v) => ({ key: `v${v.name}`, date: v.signs_date, icon: 'lucide-activity', tone: 'bg-warn-soft text-warn', title: t('Vital signs'),
+    ...x.vitals.map((v) => ({ key: `v${v.name}`, date: v.signs_date, icon: 'lucide-activity', tone: 'bg-warn-soft text-warn', title: t('Vital signs'), time: String(v.signs_time || '').slice(0, 5),
       sub: [v.temperature && `${v.temperature} °C`, v.pulse && `${v.pulse}/min`, v.bp && `${v.bp} mmHg`, v.weight && `${v.weight} kg`].filter(Boolean).join(' · ') })),
   ]
-  return out.sort((a, b) => String(b.date).localeCompare(String(a.date)))
+  return out.sort((a, b) => `${b.date} ${b.time || ''}`.localeCompare(`${a.date} ${a.time || ''}`))
 })
 
 async function load() {

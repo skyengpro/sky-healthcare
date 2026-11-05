@@ -12,6 +12,17 @@
       </div>
     </section>
 
+    <!-- phone only: the sidebar is not there, so these pages are reached from here -->
+    <Panel class="mb-4 md:hidden" :title="t('Go to')">
+      <ul class="px-2 pb-2">
+        <li v-for="l in shortcuts" :key="l.name">
+          <RouterLink :to="{ name: l.name }" class="flex items-center gap-3 rounded-[12px] px-3 py-3 text-[14px] font-semibold text-ink transition hover:bg-paper">
+            <span :class="l.icon" class="size-[18px] text-ink-mute" />{{ t(l.label) }}<span class="lucide-chevron-right ml-auto size-4 text-ink-faint" />
+          </RouterLink>
+        </li>
+      </ul>
+    </Panel>
+
     <Panel class="mb-4" :title="t('Language')" padded>
       <div class="grid grid-cols-2 gap-2">
         <button v-for="l in [{ v: 'fr', n: 'Français' }, { v: 'en', n: 'English' }]" :key="l.v" class="flex items-center justify-between rounded-[14px] border px-4 py-3.5 text-left text-[14px] font-semibold transition"
@@ -66,7 +77,7 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { FormControl, toast } from 'frappe-ui'
 import Initials from '@/components/Initials.vue'
 import Btn from '@/components/Btn.vue'
@@ -78,6 +89,12 @@ import { lang, setLanguage, t } from '@/i18n'
 import { session, logout } from '@/session'
 import { setTheme, themeMode } from '@/theme'
 import { ui } from '@/ui'
+
+const shortcuts = computed(() => [
+  { name: 'requests', label: 'Medical requests', icon: 'lucide-clipboard-list' },
+  { name: 'reports', label: 'Reports', icon: 'lucide-chart-no-axes-column' },
+  ...(session.isAdmin ? [{ name: 'staff', label: 'Staff', icon: 'lucide-id-card' }] : []),
+])
 
 const themes = [
   { v: 'light', label: 'Light', icon: 'lucide-sun' },

@@ -344,4 +344,42 @@ check(
 	d2["name"] not in [x["name"] for x in staff.get("health.consultations", {"patient": p["name"]})],
 )
 
+# a finished consultation can be corrected (doctor's words and vital signs), orders stay
+staff.post(
+	"health.update_consultation",
+	{
+		"name": c["name"],
+		"symptoms": ["Fever"],
+		"diagnoses": ["Malaria"],
+		"notes": "Fever, corrected",
+		"vitals": {"temperature": "37.9", "pulse": "88"},
+	},
+)
+d = staff.get("health.consultation", {"name": c["name"]})
+check(
+	"a finished consultation can be corrected",
+	d["encounter_comment"] == "Fever, corrected"
+	and d["vitals"]["temperature"] == "37.9"
+	and d["state"] == "done",
+)
+check("its prescription is untouched by the correction", len(d["prescriptions"]) == 1)
+fails(
+	"a draft cannot use the correction route",
+	lambda: staff.post("health.update_consultation", {"name": d2["name"], "notes": "x"}),
+	"finished",
+)
+# a treatment that is done is dated today; only a planned one may be dated later
+fails(
+	"a done treatment cannot have a future date",
+	lambda: staff.post(
+		"health.record_procedure",
+		{"patient": p["name"], "template": tpl["name"], "complete": 1, "date": "2999-01-01"},
+	),
+	"future date",
+)
+future = staff.post(
+	"health.record_procedure",
+	{"patient": p["name"], "template": tpl["name"], "complete": 0, "date": "2999-01-01"},
+)
+check("a planned treatment can be dated later", future["status"] == "Pending")
 print(f"\n{ok} checks passed")

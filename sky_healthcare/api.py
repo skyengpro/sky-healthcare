@@ -316,6 +316,31 @@ def medicine(code: str):
 
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
+def add_category(name: str):
+	"""Add a medicine category (a group under "Medicine"). An existing one is returned as it is."""
+	name = " ".join((name or "").split())
+	if not name:
+		frappe.throw(_("Please enter the name of the category"))
+	if len(name) > 70:
+		frappe.throw(_("The category name is too long"))
+	for existing in _medicine_groups():
+		if existing.lower() == name.lower():
+			return {"name": existing, "created": False}
+	if frappe.db.exists("Item Group", name):
+		frappe.throw(_("A group named {0} already exists in ERPNext. Choose another name.").format(name))
+	frappe.get_doc(
+		{
+			"doctype": "Item Group",
+			"item_group_name": name,
+			"parent_item_group": "Medicine",
+			"is_group": 0,
+		}
+	).insert(ignore_permissions=True)
+	return {"name": name, "created": True}
+
+
+@frappe.whitelist(methods=["POST"])
+@_writes(admin=False)
 def save_medicine(
 	name: str,
 	category: str,

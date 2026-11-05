@@ -574,8 +574,8 @@ def record_procedure(
 		]
 	)
 	date = getdate(date or nowdate())
-	if date > getdate():
-		frappe.throw(_("The date cannot be in the future"))
+	if date > getdate() and cint(complete):
+		frappe.throw(_("A treatment that is done cannot have a future date. Plan it for that day instead."))
 	if service_request:  # a treatment the doctor asked for in a consultation
 		sr = frappe.db.get_value(
 			"Service Request",
@@ -624,6 +624,9 @@ def complete_procedure(name: str):
 	cp = frappe.get_doc("Clinical Procedure", name)
 	if cp.docstatus != 1 or cp.status == "Cancelled":
 		frappe.throw(_("This treatment was cancelled"))
+	if cp.status != "Completed":  # it happens today, whatever day it was planned for
+		cp.db_set("start_date", getdate())
+		cp.start_date = getdate()
 	return {"name": cp.name, "stock_entry": _complete(cp)}
 
 
@@ -903,6 +906,65 @@ def save_consultation(
 	if cint(finish):
 		doc.submit()
 	return {"name": doc.name, "status": "done" if cint(finish) else "draft"}
+
+
+@frappe.whitelist(methods=["POST"])
+@_writes(admin=False)
+def update_consultation(
+	name: str,
+	practitioner: str | None = None,
+	symptoms: list | str | None = None,
+	diagnoses: list | str | None = None,
+	notes: str | None = None,
+	vitals: dict | str | None = None,
+):
+	"""Correct what the doctor wrote on a finished consultation.
+
+	The doctor, symptoms, diagnoses, observation and vital signs can be changed. The prescription and the treatments
+	were already ordered when it was finished, so they stay as they are.
+	"""
+	_require_health()
+	symptoms, diagnoses = _loads(symptoms), _loads(diagnoses)
+	vitals = _loads(vitals) or {}
+	if frappe.db.get_value("Patient Encounter", name, "docstatus") != 1:
+		frappe.throw(_("Only a finished consultation can be corrected this way"))
+	doc = frappe.get_doc("Patient Encounter", name)
+	if practitioner and practitioner != doc.practitioner:
+		if not frappe.db.exists("Healthcare Practitioner", {"name": practitioner, "status": "Active"}):
+			frappe.throw(_("Please choose the doctor for this consultation"))
+		doc.practitioner = practitioner
+	if not (notes or symptoms or diagnoses or doc.drug_prescription or doc.procedure_prescription):
+		frappe.throw(_("Write at least one observation"))
+	doc.encounter_comment = notes or ""
+	doc.set("symptoms", [{"complaint": n} for n in _named("Complaint", "complaints", symptoms)])
+	doc.set("diagnosis", [{"diagnosis": n} for n in _named("Diagnosis", "diagnosis", diagnoses)])
+	doc.flags.ignore_permissions = True
+	doc.flags.ignore_validate_update_after_submit = True
+	doc.save()
+	_edit_vitals(doc, vitals)
+	return {"name": doc.name}
+
+
+def _edit_vitals(doc, vitals):
+	"""Change the vital signs of a finished consultation (a new reading is created if there was none)."""
+	data = {
+		k: (flt(v) if k in ("weight", "height") else str(v).strip())
+		for k, v in (vitals or {}).items()
+		if k in VITALS and str(v or "").strip() != ""
+	}
+	existing = frappe.db.get_value("Vital Signs", {"encounter": doc.name, "docstatus": ["<", 2]}, "name")
+	if not data and not existing:
+		return
+	if not existing:
+		_save_vitals(doc, data, 1)
+		return
+	vs = frappe.get_doc("Vital Signs", existing)
+	for k in VITALS:
+		vs.set(k, data.get(k))
+	vs.flags.ignore_permissions = True
+	vs.flags.ignore_validate_update_after_submit = True
+	vs.save()
+	_keep_owner(vs)
 
 
 def nowtime_str():

@@ -235,12 +235,6 @@ const failed = computed(() => net.outbox.filter((i) => i.status === 'failed').le
 
 const userMenu = computed(() => [
   { label: t('My account'), icon: 'lucide-user-round', route: { name: 'account' } },
-  { label: t('Notifications'), icon: 'lucide-bell', route: { name: 'notifications' } },
-  ...(session.health ? [
-    { label: pending.value ? `${t('Medical requests')} (${pending.value})` : t('Medical requests'), icon: 'lucide-clipboard-list', route: { name: 'requests' } },
-    { label: t('Reports'), icon: 'lucide-chart-no-axes-column', route: { name: 'reports' } },
-  ] : []),
-  ...(session.isAdmin ? [{ label: t('Staff'), icon: 'lucide-users-round', route: { name: 'staff' } }] : []),
   { label: isDark.value ? t('Light theme') : t('Dark theme'), icon: isDark.value ? 'lucide-sun' : 'lucide-moon', onClick: () => setTheme(isDark.value ? 'light' : 'dark') },
   { label: lang.value === 'fr' ? 'English' : 'Français', icon: 'lucide-languages', onClick: () => setLanguage(lang.value === 'fr' ? 'en' : 'fr') },
   { label: t('Log out'), icon: 'lucide-log-out', theme: 'red', onClick: confirmLogout },
