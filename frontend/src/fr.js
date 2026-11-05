@@ -37,6 +37,9 @@ export default {
   // login
   Add: 'Ajouter',
   'New category': 'Nouvelle catégorie',
+  'Delete this category': 'Supprimer cette catégorie',
+  'Delete the category {0}? This only works if no medicine uses it.': 'Supprimer la catégorie {0} ? Possible seulement si aucun médicament ne l’utilise.',
+  'Category deleted': 'Catégorie supprimée',
   'Category name': 'Nom de la catégorie',
   'Category added': 'Catégorie ajoutée',
   'This category already exists': 'Cette catégorie existe déjà',

@@ -340,6 +340,28 @@ def add_category(name: str):
 
 
 @frappe.whitelist(methods=["POST"])
+@_writes(admin=True)
+def delete_category(name: str):
+	"""Remove a medicine category that no medicine uses any more (administrators only)."""
+	if name == "Medicine" or name not in _medicine_groups():
+		frappe.throw(_("Category not found"), frappe.DoesNotExistError)
+	used = frappe.db.count("Item", {"item_group": name})
+	if used:
+		frappe.throw(
+			_("{0} medicine(s) still use the category {1}. Move them to another category first.").format(
+				used, name
+			)
+		)
+	try:
+		frappe.delete_doc("Item Group", name, ignore_permissions=True)
+	except frappe.LinkExistsError:
+		frappe.throw(
+			_("The category {0} is used elsewhere in the system and cannot be deleted.").format(name)
+		)
+	return {"name": name, "deleted": True}
+
+
+@frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
 def save_medicine(
 	name: str,

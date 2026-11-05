@@ -4,7 +4,7 @@
     <aside class="sticky top-0 hidden h-screen shrink-0 flex-col border-r border-line bg-card transition-[width] duration-200 md:flex"
       :class="folded ? 'w-[76px]' : 'w-[248px]'">
       <div class="flex items-center pb-6 pt-6" :class="folded ? 'flex-col gap-3 px-3' : 'justify-between pl-6 pr-3'">
-        <RouterLink to="/" :aria-label="t('Dashboard')"><Logo :mark-only="folded" :subtitle="session.siteName" /></RouterLink>
+        <RouterLink to="/" :aria-label="t('Dashboard')"><Logo :mark-only="folded" /></RouterLink>
         <button class="flex size-8 items-center justify-center rounded-full text-ink-mute transition hover:bg-paper hover:text-ink"
           :title="folded ? t('Expand menu') : t('Collapse menu')" :aria-label="folded ? t('Expand menu') : t('Collapse menu')" @click="toggleFold">
           <span :class="folded ? 'lucide-panel-left-open' : 'lucide-panel-left-close'" class="size-[17px]" />

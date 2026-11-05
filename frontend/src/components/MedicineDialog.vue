@@ -8,10 +8,22 @@
       <div>
         <FormControl variant="outline" v-model="form.category" type="select" :options="opt(session.options.categories)" :label="t('Category')"
           required size="lg" :placeholder="t('Choose…')" />
-        <button v-if="!newCat.open" type="button" class="mt-1.5 inline-flex items-center gap-1 text-[12.5px] font-medium text-apo hover:underline"
-          @click="newCat.open = true">
-          <span class="lucide-plus size-3.5" />{{ t('New category') }}
-        </button>
+        <div v-if="!newCat.open && !delCat.confirm" class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+          <button type="button" class="inline-flex items-center gap-1 text-[12.5px] font-medium text-apo hover:underline" @click="newCat.open = true">
+            <span class="lucide-plus size-3.5" />{{ t('New category') }}
+          </button>
+          <button v-if="session.isAdmin && form.category" type="button"
+            class="inline-flex items-center gap-1 text-[12.5px] font-medium text-alert hover:underline" @click="delCat.confirm = true">
+            <span class="lucide-trash-2 size-3.5" />{{ t('Delete this category') }}
+          </button>
+        </div>
+        <div v-else-if="delCat.confirm" class="mt-2 rounded-[10px] border border-alert/20 bg-card p-3 text-[13px] text-ink">
+          <p>{{ t('Delete the category {0}? This only works if no medicine uses it.', form.category) }}</p>
+          <div class="mt-2 flex gap-2">
+            <Btn size="sm" variant="danger" :label="t('Delete')" :loading="delCat.saving" @click="deleteCategory" />
+            <Btn size="sm" variant="ghost" :label="t('Cancel')" @click="delCat.confirm = false" />
+          </div>
+        </div>
         <div v-else ref="catBox" class="mt-2 flex items-start gap-2">
           <FormControl variant="outline" v-model="newCat.name" class="min-w-0 flex-1" :placeholder="t('Category name')"
             @keydown.enter.prevent="addCategory" />
@@ -70,6 +82,7 @@ const form = reactive(blank())
 const saving = ref(false)
 const error = ref('')
 const newCat = reactive({ open: false, name: '', saving: false })
+const delCat = reactive({ confirm: false, saving: false })
 const catBox = ref(null)
 watch(() => newCat.open, async (open) => {
   if (!open) return
@@ -84,6 +97,7 @@ watch(() => ui.medicine.open, async (open) => {
   Object.assign(form, blank())
   error.value = ''
   Object.assign(newCat, { open: false, name: '', saving: false })
+  Object.assign(delCat, { confirm: false, saving: false })
   if (ui.medicine.code) {
     const m = await get('medicine', { code: ui.medicine.code })
     Object.assign(form, { name: m.name, category: m.category, form: m.form, strength: m.strength, unit: m.unit,
@@ -106,6 +120,23 @@ async function addCategory() {
     toast.error(e.message)
   } finally {
     newCat.saving = false
+  }
+}
+
+async function deleteCategory() {
+  const name = form.category
+  delCat.saving = true
+  try {
+    await post('delete_category', { name })
+    session.options.categories = session.options.categories.filter((c) => c !== name)
+    form.category = null
+    delCat.confirm = false
+    toast.success(t('Category deleted'), { description: name })
+  } catch (e) {
+    toast.error(e.message)
+    delCat.confirm = false
+  } finally {
+    delCat.saving = false
   }
 }
 

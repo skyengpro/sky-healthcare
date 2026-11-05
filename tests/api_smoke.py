@@ -207,4 +207,13 @@ fails(
 	lambda: staff.post("add_category", {"name": "Products"}),
 	"already exists",
 )
+fails("staff cannot delete a category", lambda: staff.post("delete_category", {"name": cat}), "administrator")
+used = staff.get("medicine", {"code": name})["category"]
+fails(
+	"a category that medicines use cannot be deleted",
+	lambda: admin.post("delete_category", {"name": used}),
+	"still use",
+)
+admin.post("delete_category", {"name": cat})
+check("an administrator can delete an unused category", cat not in staff.get("boot")["options"]["categories"])
 print(f"\n{ok} checks passed")
