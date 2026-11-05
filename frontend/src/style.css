@@ -1,0 +1,200 @@
+@import '@fontsource-variable/newsreader/opsz.css';
+@import '@fontsource-variable/newsreader/opsz-italic.css';
+@import '@fontsource-variable/figtree/index.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+@import 'frappe-ui/style.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Healthcare Management colour tokens (RGB channels, used through tailwind.config.js) */
+:root {
+  --ps-paper: 246 245 241;
+  --ps-paper-deep: 239 237 231;
+  --ps-card: 255 255 255;
+  --ps-ink: 22 24 29;
+  --ps-ink-soft: 70 73 81;
+  --ps-ink-mute: 104 106 112;
+  --ps-ink-faint: 160 161 165;
+  --ps-on-ink: 255 255 255;
+  --ps-line: 232 230 224;
+  --ps-line-strong: 214 211 203;
+  --ps-apo: 35 90 73;
+  --ps-apo-deep: 23 63 51;
+  --ps-apo-mid: 77 139 116;
+  --ps-apo-soft: 229 238 233;
+  --ps-apo-mist: 241 246 243;
+  --ps-on-apo: 255 255 255;
+  --ps-warn: 166 56 47;
+  --ps-warn-mid: 200 110 100;
+  --ps-warn-soft: 248 231 228;
+  --ps-alert: 166 56 47;
+  --ps-alert-soft: 248 231 228;
+  --ps-info: 70 73 81;
+  --ps-info-soft: 239 237 231;
+  --ps-shadow: 22 24 29;
+
+  /* frappe-ui variables, warmed to sit on paper */
+  --surface-base: #ffffff;
+  --surface-gray-1: #f8f7f4;
+  --surface-gray-2: #f3f2ee;
+  --surface-gray-3: #ecebe6;
+  --surface-gray-4: #e1dfd8;
+  --surface-sidebar: #ffffff;
+  --surface-elevation-1: #ffffff;
+  --surface-elevation-2: #ffffff;
+  --surface-elevation-3: #ffffff;
+  --ink-gray-4: #a0a1a5;
+  --ink-gray-5: #686a70;
+  --ink-gray-6: #585b62;
+  --ink-gray-7: #464951;
+  --ink-gray-8: #26282e;
+  --ink-gray-9: #16181d;
+  --outline-gray-1: #eeece6;
+  --outline-gray-2: #e3e1da;
+  --outline-gray-3: #d3d0c7;
+  --outline-gray-4: #b3b0a7;
+  --outline-elevation-1: #eeece6;
+  --outline-elevation-2: #e3e1da;
+  --surface-gray-10: #16181d;
+}
+
+/* dark: warm charcoal, never pure black; the green is lifted so it stays readable */
+[data-theme='dark'] {
+  --ps-paper: 21 22 20;
+  --ps-paper-deep: 34 35 32;
+  --ps-card: 28 29 27;
+  --ps-ink: 238 236 230;
+  --ps-ink-soft: 200 198 191;
+  --ps-ink-mute: 156 155 149;
+  --ps-ink-faint: 106 106 101;
+  --ps-on-ink: 22 24 29;
+  --ps-line: 46 47 44;
+  --ps-line-strong: 64 65 61;
+  --ps-apo: 120 188 160;
+  --ps-apo-deep: 168 214 193;
+  --ps-apo-mid: 96 166 138;
+  --ps-apo-soft: 33 56 47;
+  --ps-apo-mist: 27 42 36;
+  --ps-on-apo: 14 30 24;
+  --ps-warn: 238 132 120;
+  --ps-warn-mid: 200 110 100;
+  --ps-warn-soft: 62 33 30;
+  --ps-alert: 238 132 120;
+  --ps-alert-soft: 62 33 30;
+  --ps-info: 200 198 191;
+  --ps-info-soft: 34 35 32;
+  --ps-shadow: 0 0 0;
+
+  --surface-base: #1c1d1b;
+  --surface-gray-1: #20211f;
+  --surface-gray-2: #262725;
+  --surface-gray-3: #2e2f2c;
+  --surface-gray-4: #3a3b38;
+  --surface-sidebar: #1c1d1b;
+  --surface-elevation-1: #222321;
+  --surface-elevation-2: #252624;
+  --surface-elevation-3: #282927;
+  --ink-gray-4: #6a6a65;
+  --ink-gray-5: #9c9b95;
+  --ink-gray-6: #b2b0aa;
+  --ink-gray-7: #c8c6bf;
+  --ink-gray-8: #e2e0da;
+  --ink-gray-9: #eeece6;
+  --outline-gray-1: #2e2f2c;
+  --outline-gray-2: #3a3b38;
+  --outline-gray-3: #4a4b47;
+  --outline-gray-4: #64655f;
+  --outline-elevation-1: #2e2f2c;
+  --outline-elevation-2: #3a3b38;
+  --surface-gray-10: #eeece6;
+}
+
+html,
+body {
+  @apply bg-paper text-ink antialiased;
+  transition: background-color 0.2s ease;
+  font-family: 'Figtree Variable', system-ui, sans-serif;
+  font-feature-settings: 'ss01';
+  -webkit-tap-highlight-color: transparent;
+}
+body * {
+  font-family: inherit;
+}
+.font-display {
+  font-family: 'Newsreader Variable', Georgia, serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.015em;
+  font-weight: 450;
+}
+.font-label {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  letter-spacing: 0;
+}
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+.eyebrow {
+  @apply text-[11px] font-semibold uppercase text-ink-mute;
+  letter-spacing: 0.14em;
+}
+
+/* softer, rounder inputs everywhere (frappe-ui inputs, comboboxes, selects, date pickers) */
+input.form-input,
+textarea.form-textarea,
+.form-input,
+.form-textarea,
+button[role='combobox'],
+[role='combobox'] input {
+  border-radius: 10px !important;
+}
+
+/* dialog titles in the display serif, like page titles */
+[role='dialog'] header h3 {
+  font-family: 'Newsreader Variable', Georgia, serif !important;
+  font-size: 24px !important;
+  font-weight: 450 !important;
+  letter-spacing: -0.015em;
+}
+
+.surface {
+  @apply rounded-[18px] border border-line bg-card shadow-card;
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--ps-apo-mid));
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rise {
+    animation: rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+}
+
+@media print {
+  aside,
+  header,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+}

@@ -271,3 +271,20 @@ required_apps = ["frappe/erpnext", "frappe/healthcare"]
 # ------------
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
+
+after_install = "sky_healthcare.setup.install.after_install"
+after_migrate = "sky_healthcare.setup.install.after_migrate"
+setup_wizard_complete = "sky_healthcare.setup.install.after_setup_wizard"
+
+# Healthcare Management PWA, served at /sky-healthcare
+website_route_rules = [{"from_route": "/sky-healthcare/<path:app_path>", "to_route": "sky-healthcare"}]
+page_renderer = ["sky_healthcare.service_worker.ServiceWorkerPage"]
+role_home_page = {"Pharmacy Staff": "sky-healthcare", "Pharmacy Admin": "sky-healthcare"}
+add_to_apps_screen = [
+	{
+		"name": "sky_healthcare",
+		"logo": "/assets/sky_healthcare/images/logo-mark.svg",
+		"title": "Healthcare Management",
+		"route": "/sky-healthcare",
+	}
+]
