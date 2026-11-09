@@ -8,8 +8,8 @@ Each migration applies the roles, site settings, custom fields and record sharin
 
 | Role | Access in the app |
 |---|---|
-| `Pharmacy Staff` | Patients, consultations, treatments, medicines, stock, stock requests and reports |
-| `Pharmacy Admin` | Same, and approves or rejects requests, manages staff and deletes categories |
+| `Clinic Staff` | Patients, consultations, treatments, medicines, stock, stock requests and reports |
+| `Clinic Admin` | Same, and approves or rejects requests, manages staff and deletes categories |
 
 Neither role has Desk access or permissions on documents. The app API checks the role and then writes as Administrator. The real user is recorded as owner, last editor and in the change history. Direct database updates made by ERPNext, such as batch quantities, stay under Administrator.
 

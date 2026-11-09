@@ -1,7 +1,7 @@
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
-ROLES = ["Pharmacy Staff", "Pharmacy Admin"]
+ROLES = ["Clinic Staff", "Clinic Admin"]
 # Site-wide. Re-applied at each migration; docs/default_install_configuration.md explains each one.
 STOCK_SETTINGS = {
 	"enable_serial_and_batch_no_for_item": 1,
@@ -389,7 +389,7 @@ def create_alerts():
 		condition="doc.batch_qty > 0",
 		enabled=1,
 		message="Batch {{ doc.name }} of {{ doc.item }} expires on {{ doc.expiry_date }}. Qty left: {{ doc.batch_qty }}.",
-		recipients=[{"receiver_by_role": "Pharmacy Admin"}, {"receiver_by_role": "Pharmacy Staff"}],
+		recipients=[{"receiver_by_role": "Clinic Admin"}, {"receiver_by_role": "Clinic Staff"}],
 	)
 	_alert(
 		"Low stock: reorder requested ({{ doc.name }})",
@@ -399,7 +399,7 @@ def create_alerts():
 		condition="doc.auto_created_via_reorder",
 		enabled=1,
 		message="Stock fell below the minimum level. Request {{ doc.name }} was created.",
-		recipients=[{"receiver_by_role": "Pharmacy Admin"}],
+		recipients=[{"receiver_by_role": "Clinic Admin"}],
 	)
 	# renamed from "Stock request ...": drop the old notification so a site does not get both
 	frappe.db.delete(
@@ -414,5 +414,5 @@ def create_alerts():
 		condition="not doc.auto_created_via_reorder",
 		enabled=1,
 		message="{{ doc.owner }} asked for stock. Urgency: {{ doc.custom_urgency }}. {{ doc.custom_reason or '' }}",
-		recipients=[{"receiver_by_role": "Pharmacy Admin"}],
+		recipients=[{"receiver_by_role": "Clinic Admin"}],
 	)

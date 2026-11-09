@@ -16,8 +16,8 @@ export default {
   'Log out?': 'Se déconnecter ?',
   Language: 'Langue',
   Alerts: 'Alertes',
-  'Pharmacy administrator': 'Administrateur de la pharmacie',
-  'Pharmacy staff': 'Personnel de la pharmacie',
+  'Clinic administrator': 'Administrateur de la clinique',
+  'Clinic staff': 'Personnel de la clinique',
   'No alerts. Everything looks good.': 'Aucune alerte. Tout va bien.',
   'You are offline. You see the last saved data, and new stock movements are kept and sent later.':
     'Vous êtes hors ligne. Vous voyez les dernières données enregistrées ; les nouveaux mouvements sont gardés et envoyés plus tard.',

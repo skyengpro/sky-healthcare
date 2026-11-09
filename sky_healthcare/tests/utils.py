@@ -22,7 +22,7 @@ def unique(prefix):
 	return f"{prefix} {frappe.generate_hash(length=8)}"
 
 
-def make_staff(role="Pharmacy Staff"):
+def make_staff(role="Clinic Staff"):
 	email = f"{frappe.generate_hash(length=10)}@example.com"
 	api.save_staff(email=email, full_name="Test Staff", role=role)
 	return email

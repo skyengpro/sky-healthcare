@@ -45,7 +45,7 @@
               <template v-if="!folded">
                 <div class="min-w-0 flex-1">
                   <div class="truncate text-[13.5px] font-semibold text-ink">{{ session.user.full_name }}</div>
-                  <div class="truncate text-[12px] text-ink-mute">{{ session.isAdmin ? t('Pharmacy administrator') : t('Pharmacy staff') }}</div>
+                  <div class="truncate text-[12px] text-ink-mute">{{ session.isAdmin ? t('Clinic administrator') : t('Clinic staff') }}</div>
                 </div>
                 <span class="lucide-chevrons-up-down size-4 text-ink-faint" />
               </template>

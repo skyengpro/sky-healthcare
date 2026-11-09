@@ -13,8 +13,8 @@
         <div class="flex items-start justify-between gap-3">
           <Initials :name="u.full_name" size="lg" />
           <span class="rounded-full px-2.5 py-1 text-[11.5px] font-semibold"
-            :class="u.role === 'Pharmacy Admin' ? 'bg-ink text-on-ink' : 'bg-apo-soft text-apo-deep'">
-            {{ u.role === 'Pharmacy Admin' ? t('Administrator') : t('Staff') }}
+            :class="u.role === 'Clinic Admin' ? 'bg-ink text-on-ink' : 'bg-apo-soft text-apo-deep'">
+            {{ u.role === 'Clinic Admin' ? t('Administrator') : t('Staff') }}
           </span>
         </div>
         <div class="mt-4 font-display text-[21px] leading-tight text-ink">
@@ -81,14 +81,14 @@ const saving = ref(false)
 const error = ref('')
 const form = reactive({})
 const roles = [
-  { value: 'Pharmacy Staff', label: 'Staff', text: 'Adds and gives out stock, sends requests.' },
-  { value: 'Pharmacy Admin', label: 'Administrator', text: 'Also approves requests and manages staff.' },
+  { value: 'Clinic Staff', label: 'Staff', text: 'Adds and gives out stock, sends requests.' },
+  { value: 'Clinic Admin', label: 'Administrator', text: 'Also approves requests and manages staff.' },
 ]
 
 function edit(u) {
   Object.assign(form, u
     ? { existing: true, full_name: u.full_name, email: u.email, role: u.role, password: '', enabled: !!u.enabled }
-    : { existing: false, full_name: '', email: '', role: 'Pharmacy Staff', password: '', enabled: true })
+    : { existing: false, full_name: '', email: '', role: 'Clinic Staff', password: '', enabled: true })
   error.value = ''
   open.value = true
 }

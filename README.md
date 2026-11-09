@@ -29,7 +29,7 @@ PWA (Vue 3 + frappe-ui)  ->  sky_healthcare.api / .health (Python, in the site) 
 /sky-healthcare                    checks the pharmacy role, one call per action
 ```
 
-- **Roles:** `Pharmacy Staff` and `Pharmacy Admin`. Neither needs the ERPNext desk. The API checks the
+- **Roles:** `Clinic Staff` and `Clinic Admin`. Neither needs the ERPNext desk. The API checks the
   role, then does the work on the user's behalf, and every record keeps the real user.
 - **Stock side (ERPNext):** Item (medicine), Batch (lot and expiry), Warehouse "Pharmacy", Stock Entry,
   Material Request (the app's "medical request"), Stock Ledger.
@@ -92,7 +92,7 @@ Node packages are installed by `bench get-app` (or `bench setup requirements --n
 What the install configures, and what each migration overwrites, is listed in
 [docs/default_install_configuration.md](docs/default_install_configuration.md).
 
-Create the first users from the desk (**User**, role `Pharmacy Admin` or `Pharmacy Staff`). Administrators
+Create the first users from the desk (**User**, role `Clinic Admin` or `Clinic Staff`). Administrators
 then add the rest of the team on the **Staff** page of the app.
 
 On Frappe Cloud / Press: add this repository under the bench's **Apps** next to ERPNext and Healthcare,
@@ -164,8 +164,8 @@ bench --site <site> set-config allow_tests true
 bench --site <site> run-tests --app sky_healthcare
 ```
 
-The other tests run against a live site with the app installed and two users, a Pharmacy Staff and a
-Pharmacy Admin. They create their own test data (names start with `ZZ`, `E2E` or `Care`) and leave it
+The other tests run against a live site with the app installed and two users, a Clinic Staff and a
+Clinic Admin. They create their own test data (names start with `ZZ`, `E2E` or `Care`) and leave it
 in place, so use a development site.
 
 ```bash

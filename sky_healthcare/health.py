@@ -299,9 +299,7 @@ def save_patient(
 		doc.update(fields)
 		doc.save(ignore_permissions=True)
 	else:
-		doc = frappe.get_doc(
-			{"doctype": "Patient", "custom_client_id": client_id, **fields}
-		)
+		doc = frappe.get_doc({"doctype": "Patient", "custom_client_id": client_id, **fields})
 		doc.insert(ignore_permissions=True)
 	return {"name": doc.name, "patient_name": doc.patient_name}
 
@@ -647,7 +645,7 @@ def complete_procedure(name: str):
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
 def cancel_procedure(name: str, reason: str | None = None):
-	"""Cancel a procedure (pharmacy staff and administrators).
+	"""Cancel a procedure (clinic staff and administrators).
 
 	A planned one is simply cancelled. A completed one needs a reason: its stock movement is cancelled
 	too, so the medicines go back into the same batches. The original movement stays in the history,
@@ -712,7 +710,7 @@ def sync_practitioner(user):
 def sync_all_practitioners():
 	users = frappe.get_all(
 		"Has Role",
-		filters={"role": ["in", ["Pharmacy Staff", "Pharmacy Admin"]], "parenttype": "User"},
+		filters={"role": ["in", ["Clinic Staff", "Clinic Admin"]], "parenttype": "User"},
 		pluck="parent",
 	)
 	for user in set(users):

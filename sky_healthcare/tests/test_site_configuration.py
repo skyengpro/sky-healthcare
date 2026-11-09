@@ -52,9 +52,7 @@ class TestSiteSettings(IntegrationTestCase):
 		medicine = make_medicine()
 		run_as(staff, receive, medicine, days_to_expiry=300)
 		first = run_as(staff, receive, medicine, days_to_expiry=100)["batch"]
-		result = run_as(
-			staff, api.give_out, medicine=medicine, qty=5, reason="Other authorized adjustment"
-		)
+		result = run_as(staff, api.give_out, medicine=medicine, qty=5, reason="Other authorized adjustment")
 		self.assertEqual(result["batches"], [first])
 
 	def test_consultation_is_saved_without_an_appointment(self):
@@ -97,9 +95,9 @@ class TestMigration(IntegrationTestCase):
 		self.assertTrue(frappe.db.exists("Appointment Type", health.APPOINTMENT_TYPE))
 
 	def test_role_desk_access_is_restored(self):
-		frappe.db.set_value("Role", "Pharmacy Staff", "desk_access", 1)
+		frappe.db.set_value("Role", "Clinic Staff", "desk_access", 1)
 		install.after_migrate()
-		self.assertEqual(frappe.db.get_value("Role", "Pharmacy Staff", "desk_access"), 0)
+		self.assertEqual(frappe.db.get_value("Role", "Clinic Staff", "desk_access"), 0)
 
 	def test_settings_are_not_saved_when_nothing_changed(self):
 		install.configure_stock()

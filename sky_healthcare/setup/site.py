@@ -174,7 +174,7 @@ def _user(u):
 	from sky_healthcare.api import save_staff
 
 	email = u["email"].strip().lower()
-	role = {"admin": "Pharmacy Admin", "staff": "Pharmacy Staff"}.get(u.get("role", "staff"), u.get("role"))
+	role = {"admin": "Clinic Admin", "staff": "Clinic Staff"}.get(u.get("role", "staff"), u.get("role"))
 	new = not frappe.db.exists("User", email)
 	password = u.get("password") or (_password() if new else None)
 	save_staff(email=email, full_name=u["full_name"], role=role, password=password)

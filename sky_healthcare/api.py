@@ -16,9 +16,9 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, flt, getdate, nowdate
 
-STAFF_ROLES = ("Pharmacy Staff", "Pharmacy Admin", "System Manager")
-ADMIN_ROLES = ("Pharmacy Admin", "System Manager")
-PHARMACY_ROLES = ("Pharmacy Staff", "Pharmacy Admin")
+STAFF_ROLES = ("Clinic Staff", "Clinic Admin", "System Manager")
+ADMIN_ROLES = ("Clinic Admin", "System Manager")
+PHARMACY_ROLES = ("Clinic Staff", "Clinic Admin")
 EXPIRY_WARNING_DAYS = 90
 # Why stock may leave without a patient. Medicine for a patient leaves through a procedure ("Used in a procedure").
 # Older entries keep their earlier reasons ("Dispensed to a patient", "Transfer to ...") in the history.
@@ -47,7 +47,7 @@ def _require_staff():
 def _require_admin():
 	_require_staff()
 	if not (_roles() & set(ADMIN_ROLES)):
-		frappe.throw(_("Only a pharmacy administrator can do this."), frappe.PermissionError)
+		frappe.throw(_("Only a clinic administrator can do this."), frappe.PermissionError)
 
 
 def _is_admin():
@@ -475,7 +475,7 @@ def save_medicine(
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
 def delete_medicine(code: str):
-	"""Remove a medicine from the list (pharmacy staff and administrators).
+	"""Remove a medicine from the list (clinic staff and administrators).
 
 	A medicine that still has stock cannot be removed. One that was never used is deleted. One with
 	history is archived instead (disabled), because ERPNext must keep its stock ledger; it disappears
@@ -689,7 +689,7 @@ def request_stock(
 	reason: str | None = None,
 	client_id: str | None = None,
 ):
-	"""Ask for medicine to be ordered. The request waits for a pharmacy administrator."""
+	"""Ask for medicine to be ordered. The request waits for a clinic administrator."""
 	_require_staff()
 	if done := _existing("Material Request", client_id):
 		return {"request": done, "duplicate": True}
@@ -1030,9 +1030,9 @@ def staff():
 	)
 	out = {}
 	for u in users:
-		row = out.setdefault(u.name, {**u, "role": "Pharmacy Staff"})
-		if u.role == "Pharmacy Admin":
-			row["role"] = "Pharmacy Admin"
+		row = out.setdefault(u.name, {**u, "role": "Clinic Staff"})
+		if u.role == "Clinic Admin":
+			row["role"] = "Clinic Admin"
 	return list(out.values())
 
 
@@ -1041,7 +1041,7 @@ def staff():
 def save_staff(
 	email: str,
 	full_name: str,
-	role: str = "Pharmacy Staff",
+	role: str = "Clinic Staff",
 	password: str | None = None,
 	enabled: int | bool | str = 1,
 ):
@@ -1059,7 +1059,7 @@ def save_staff(
 			)
 		if (
 			email == _owner()
-			and (role != "Pharmacy Admin" or not cint(enabled))
+			and (role != "Clinic Admin" or not cint(enabled))
 			and "System Manager" not in _roles()
 		):
 			frappe.throw(_("You cannot remove your own administrator access."))
