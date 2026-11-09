@@ -5,7 +5,8 @@
 Without a config file it only does the parts that need no choices (roles, fields, categories, units,
 dosages, notifications, store). See `site-setup.example.json` next to this file for every option.
 
-Every step is safe to run again: what already exists is kept, never changed or duplicated. New users
+Every step is safe to run again and creates no duplicates. Users, medicines and treatment types that
+already exist are kept; docs/default_install_configuration.md lists what is overwritten. New users
 without a password in the config get a generated one, printed once at the end.
 """
 

@@ -92,11 +92,12 @@ def _as_system():
 
 	ERPNext checks permissions deep inside stock posting (batch bundles, ledger entries), and
 	pharmacy users deliberately have no ERPNext permissions. Documents still record the real
-	user as their owner, see `_owner`.
+	user, see `record_real_user`, and their change history names them through `audit_user`.
 	"""
 	user = frappe.session.user
 	# the caller already passed the pharmacy role check in `_writes`; the real user is restored below
 	frappe.set_user("Administrator")  # nosemgrep
+	frappe.session.data.audit_user = user  # shown as "Action taken by" in the change history
 	try:
 		yield user
 	finally:
@@ -133,13 +134,21 @@ def _owner():
 	return frappe.flags.sky_healthcare_user or frappe.session.user
 
 
-def _keep_owner(doc):
-	"""Frappe records the session user (here the elevated system user) as owner; put the real user back."""
-	user = _owner()
-	if user and doc.owner != user:
-		frappe.db.set_value(doc.doctype, doc.name, "owner", user, update_modified=False)
-		doc.owner = user
-	return doc
+def record_real_user(doc, method=None):
+	"""Put the real user on every document written during an elevated call (`on_change` of all doctypes).
+
+	Frappe stamps the session user, which is Administrator inside `_as_system`. Outside an elevated
+	call this does nothing.
+	"""
+	user = frappe.flags.sky_healthcare_user
+	if not user or doc.meta.issingle or doc.meta.is_virtual:
+		return
+	values = {"modified_by": user}
+	if doc.flags.in_insert:
+		values["owner"] = user
+		doc.owner = user  # kept in memory too, or a later submit of this document would write it back
+	frappe.db.set_value(doc.doctype, doc.name, values, update_modified=False)
+	doc.modified_by = user
 
 
 def _existing(doctype, client_id):
@@ -435,7 +444,6 @@ def save_medicine(
 	item = frappe.get_doc(
 		{
 			"doctype": "Item",
-			"owner": _owner(),
 			"custom_client_id": client_id,
 			"item_code": name,
 			"item_name": name,
@@ -457,7 +465,6 @@ def save_medicine(
 		}
 	)
 	item.insert(ignore_permissions=True)
-	_keep_owner(item)
 	health.sync_medication(item.name)  # the same medicine in Frappe Health
 	out = {"code": item.name}
 	if flt(qty) > 0:
@@ -507,7 +514,7 @@ def _submit(doc):
 	doc.flags.ignore_permissions = True
 	doc.insert()
 	doc.submit()
-	return _keep_owner(doc)
+	return doc
 
 
 @frappe.whitelist(methods=["POST"])
@@ -553,14 +560,12 @@ def add_stock(
 		b = frappe.get_doc(
 			{
 				"doctype": "Batch",
-				"owner": _owner(),
 				"item": medicine,
 				"expiry_date": expiry,
 				**({"batch_id": lot} if lot else {}),
 			}
 		)
 		b.insert(ignore_permissions=True)
-		_keep_owner(b)
 		batch = b.name
 
 	wh = _warehouse()
@@ -568,7 +573,6 @@ def add_stock(
 		frappe.get_doc(
 			{
 				"doctype": "Stock Entry",
-				"owner": _owner(),
 				"stock_entry_type": "Material Receipt",
 				"company": _company(),
 				"set_posting_time": 1,
@@ -649,7 +653,6 @@ def give_out(
 		frappe.get_doc(
 			{
 				"doctype": "Stock Entry",
-				"owner": _owner(),
 				"stock_entry_type": "Material Issue",
 				"company": _company(),
 				"set_posting_time": 1,
@@ -698,7 +701,6 @@ def request_stock(
 	mr = frappe.get_doc(
 		{
 			"doctype": "Material Request",
-			"owner": _owner(),
 			"material_request_type": "Purchase",
 			"company": _company(),
 			"schedule_date": need,
@@ -712,7 +714,6 @@ def request_stock(
 	)
 	mr.flags.ignore_permissions = True
 	mr.insert()
-	_keep_owner(mr)
 	return {"request": mr.name}
 
 

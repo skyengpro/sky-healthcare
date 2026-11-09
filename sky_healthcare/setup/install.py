@@ -2,6 +2,13 @@ import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 ROLES = ["Pharmacy Staff", "Pharmacy Admin"]
+# Site-wide. Re-applied at each migration; docs/default_install_configuration.md explains each one.
+STOCK_SETTINGS = {
+	"enable_serial_and_batch_no_for_item": 1,
+	"use_serial_batch_fields": 1,
+	"pick_serial_and_batch_based_on": "Expiry",
+	"auto_indent": 1,
+}
 CATEGORIES = [
 	"Analgesic",
 	"Antibiotic",
@@ -224,22 +231,25 @@ HEALTH_FIELDS = {
 
 
 def after_install():
-	"""First install: everything in `after_migrate`, plus the site-wide stock settings and the store."""
+	"""First install: everything in `after_migrate`, plus the store."""
 	after_migrate()
 	if not erpnext_ready():
 		return  # finished by after_setup_wizard once the company exists
-	configure_stock()
 	create_warehouse()
 	# the setup wizard hook can run outside a request that commits; the store must exist when it ends
 	frappe.db.commit()  # nosemgrep
 
 
 def after_migrate():
-	"""Runs on every update. Only adds what is missing; never changes settings an administrator may have edited."""
+	"""Runs on every update. Re-applies the site configuration, overwriting local changes to it.
+
+	The catalogue is only completed: categories and units an administrator added or edited are kept.
+	"""
 	create_roles()
 	create_custom_fields(CUSTOM_FIELDS, update=True)
 	if erpnext_ready():
 		create_catalogue()
+		configure_stock()
 	create_alerts()
 	setup_health()
 
@@ -247,8 +257,9 @@ def after_migrate():
 def setup_health():
 	"""Link the pharmacy to Frappe Health: custom fields, and a Medication for every medicine."""
 	from sky_healthcare.health import (
-		ensure_appointment_type,
+		configure_appointment_type,
 		has_health,
+		open_all_practitioner_records,
 		sync_all_medications,
 		sync_all_practitioners,
 	)
@@ -265,8 +276,9 @@ def setup_health():
 			is_group=0,
 		)
 		sync_all_medications()
-		ensure_appointment_type()
+		configure_appointment_type()
 		sync_all_practitioners()
+	open_all_practitioner_records()
 
 
 def erpnext_ready():
@@ -314,17 +326,11 @@ def create_catalogue():
 
 
 def configure_stock():
-	"""Batches with expiry dates and automatic reorder requests.
-
-	These are site-wide Stock Settings, so they are only set on first install. Batch numbers are
-	required for expiry tracking; the rest can be changed back in ERPNext without breaking the app.
-	"""
-	ss = frappe.get_single("Stock Settings")
-	ss.enable_serial_and_batch_no_for_item = 1
-	ss.use_serial_batch_fields = 1
-	ss.pick_serial_and_batch_based_on = "Expiry"
-	ss.auto_indent = 1
-	ss.save(ignore_permissions=True)
+	"""Batches with expiry dates, earliest expiry first, and automatic reorder requests."""
+	settings = frappe.get_single("Stock Settings")
+	if any(settings.get(field) != value for field, value in STOCK_SETTINGS.items()):
+		settings.update(STOCK_SETTINGS)
+		settings.save(ignore_permissions=True)
 
 
 def default_company():
