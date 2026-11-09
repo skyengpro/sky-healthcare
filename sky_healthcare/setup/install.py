@@ -350,14 +350,17 @@ def create_warehouse(company=None):
 	abbr = frappe.db.get_value("Company", company, "abbr")
 	name = f"Pharmacy - {abbr}"
 	if not frappe.db.exists("Warehouse", name):
-		frappe.get_doc(
+		warehouse = frappe.get_doc(
 			{
 				"doctype": "Warehouse",
 				"warehouse_name": "Pharmacy",
 				"company": company,
 				"parent_warehouse": f"All Warehouses - {abbr}",
 			}
-		).insert(ignore_permissions=True)
+		)
+		# a missing inventory account is reported above; it must not abort the install
+		warehouse.flags.ignore_inventory_account_validation = True
+		warehouse.insert(ignore_permissions=True)
 
 
 def _alert(subject, **fields):
