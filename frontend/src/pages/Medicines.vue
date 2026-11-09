@@ -55,7 +55,7 @@
           <tbody>
             <tr v-for="m in paged.items.value" :key="m.code" class="group cursor-pointer border-b border-line/70 transition last:border-0 hover:bg-paper/60" @click="open(m)">
               <td class="py-4 pl-6 pr-3">
-                <div class="text-[14.5px] font-semibold text-ink">{{ m.name }}</div>
+                <div class="flex items-center gap-2 text-[14.5px] font-semibold text-ink">{{ m.name }} <PendingTag :show="m.pending" /></div>
                 <div class="mt-0.5 text-[12.5px] text-ink-mute">{{ [t(m.category), m.strength, t(m.form || '')].filter(Boolean).join(' · ') }}</div>
               </td>
               <td class="px-3 py-4">
@@ -84,7 +84,7 @@
         <li v-for="m in paged.items.value" :key="m.code" class="surface cursor-pointer p-4 active:bg-paper" @click="open(m)">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <div class="truncate text-[15px] font-semibold text-ink">{{ m.name }}</div>
+              <div class="flex items-center gap-2 truncate text-[15px] font-semibold text-ink">{{ m.name }} <PendingTag :show="m.pending" /></div>
               <div class="mt-0.5 truncate text-[12.5px] text-ink-mute">{{ [t(m.category), m.strength].filter(Boolean).join(' · ') }}</div>
             </div>
             <StatusBadge :status="m.status" />
@@ -111,6 +111,7 @@
 </template>
 
 <script setup>
+import PendingTag from '@/components/PendingTag.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { FormControl, Select, toast } from 'frappe-ui'

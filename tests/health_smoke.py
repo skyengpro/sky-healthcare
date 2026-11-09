@@ -382,6 +382,7 @@ future = staff.post(
 	{"patient": p["name"], "template": tpl["name"], "complete": 0, "date": "2999-01-01"},
 )
 check("a planned treatment can be dated later", future["status"] == "Pending")
+staff.post("health.cancel_procedure", {"name": future["name"]})  # a far-future plan would crowd the dashboard
 # a change sent again (the first answer was lost) is recognised and never done twice
 import uuid as _uuid
 

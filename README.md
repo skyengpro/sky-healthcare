@@ -137,23 +137,21 @@ Code style: `pre-commit install` in the repository. Python is checked with ruff 
 
 ## Working offline
 
-The app keeps working with no connection and syncs by itself when the connection returns.
+The app keeps working with no connection and syncs by itself when the connection returns. Full guide: [docs/offline.md](docs/offline.md).
 
-- **Reading:** the app, its logo and fonts, and the data people use most (lists, reference data, the files of the
-  most recent patients and medicines) are kept on the device (service worker and IndexedDB). A screen that was
-  never opened is still available if it was in the background copy made after sign-in.
-- **Writing:** stock in and out, medical requests, medicines, categories, patients, consultations, treatments and
-  treatment types are saved on the device when there is no connection, shown as already done (stock numbers move,
-  new patients and medicines appear tagged as waiting), and sent in order when the connection returns.
-- **No duplicates:** every change carries a `client_id`. The server recognises one it already recorded, so a change
-  sent twice is done once. A record made offline gets a temporary `local:` id, replaced by the real one when sent;
-  later changes that mention it are rewritten automatically.
-- **Indicator:** a bar slides in when the connection is lost, shows "Sending..." and then "All changes are sent"
-  when it returns, and a pill in the top bar lists the waiting changes (with Try again / Discard for refused ones).
-- **Needs a connection:** managing staff, changing a password, approving or rejecting requests and deleting a medicine
-  or a category.
-- **Build note:** after `npm run build`, restart the backend (or run `bench clear-website-cache`) so the page that
-  points to the new files is served.
+- **Everything shows at once:** each action is saved on the device and shown as already done, before it is sent. Stock numbers and
+  histories move, new patients, medicines, consultations and treatments appear in the lists and files, tagged "Waiting to be sent".
+- **Sent in order, once:** changes are sent when the connection returns. Every change carries a `client_id`, so a change sent twice
+  is done once. A record made offline gets a temporary `local:` id that is replaced by the real one.
+- **Clear status:** a bar tells the person they are offline (with the age of the data shown), is sending, sent everything, could not
+  send something, or needs to sign in again. A pill in the top bar lists the waiting changes, with Try again and Discard.
+- **Errors:** a change the server refuses is kept with the reason. A busy server (5xx) is retried with a growing delay before it is
+  reported.
+- **Caching:** the app, logo and fonts (service worker) and the data used most (IndexedDB, filled in the background after sign-in).
+  On a slow connection the copy on the device is shown after 2.5 s and refreshed when the answer arrives.
+- **Needs a connection:** managing staff, changing a password, approving or rejecting requests and deleting a medicine or a category.
+- **Build note:** after `npm run build`, restart the backend (or run `bench clear-website-cache`) so the page that points to the new
+  files is served.
 
 ## Tests
 
@@ -185,10 +183,11 @@ node tests/care_e2e.mjs <site-url> <staff-email> <staff-pw> <admin-email> <admin
 
 ```bash
 node tests/offline_e2e.mjs <site-url> <staff-email> <staff-pw>
+cd frontend && npm run test:offline      # unit tests of what the screens show while changes wait (no browser)
 ```
 
-`tests/offline_e2e.mjs` cuts the network, uses the app (patient, consultation, medicine, stock), reconnects and checks
-on the server that everything arrived once.
+`tests/offline_e2e.mjs` cuts the network and uses the app: patient, consultation, treatment, medicine and stock offline, still there
+after a reload, sent once on reconnecting; then a change the server refuses, a server error that is retried, and a slow connection.
 
 `tests/e2e.mjs` expects the staff user's full name to be "Grace Mbarga".
 

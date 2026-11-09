@@ -13,7 +13,7 @@
               <template v-if="showPatient"> · </template>{{ date(p.start_date) }} · {{ p.by }}
             </p>
           </div>
-          <StatusBadge :status="p.state" />
+          <span class="flex items-center gap-1.5"><PendingTag :show="p.pending" /><StatusBadge :status="p.state" /></span>
         </div>
         <ul v-if="p.items.length" class="mt-3 flex flex-wrap gap-1.5">
           <li v-for="i in p.items" :key="i.medicine" class="inline-flex items-center gap-1.5 rounded-full bg-paper-deep px-2.5 py-1 text-[12px] text-ink-soft">
@@ -44,6 +44,7 @@ import { ref } from 'vue'
 import { dialog, toast } from 'frappe-ui'
 import Btn from './Btn.vue'
 import StatusBadge from './StatusBadge.vue'
+import PendingTag from './PendingTag.vue'
 import { write } from '@/api'
 import { saved } from '@/offline/notify'
 import { t } from '@/i18n'

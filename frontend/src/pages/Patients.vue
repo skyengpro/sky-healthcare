@@ -39,7 +39,7 @@
                 <div class="flex items-center gap-3">
                   <Initials :name="p.patient_name" />
                   <div class="min-w-0">
-                    <div class="truncate text-[14.5px] font-semibold text-ink">{{ p.patient_name }}</div>
+                    <div class="flex items-center gap-2 truncate text-[14.5px] font-semibold text-ink">{{ p.patient_name }} <PendingTag :show="p.pending" /></div>
                     <div class="mt-0.5 text-[12.5px] text-ink-mute">{{ patientMeta(p) }}</div>
                   </div>
                 </div>
@@ -61,7 +61,7 @@
           <div class="flex items-center gap-3">
             <Initials :name="p.patient_name" />
             <div class="min-w-0 flex-1">
-              <div class="truncate text-[15px] font-semibold text-ink">{{ p.patient_name }}</div>
+              <div class="flex items-center gap-2 truncate text-[15px] font-semibold text-ink">{{ p.patient_name }} <PendingTag :show="p.pending" /></div>
               <div class="mt-0.5 truncate text-[12.5px] text-ink-mute">{{ patientMeta(p) }}</div>
             </div>
           </div>
@@ -79,6 +79,7 @@
 </template>
 
 <script setup>
+import PendingTag from '@/components/PendingTag.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'frappe-ui'

@@ -6,6 +6,7 @@
         <template #meta>
           <div v-if="!isNew" class="mt-3 flex flex-wrap items-center gap-2">
             <StatusBadge :status="d.state" />
+            <PendingTag :show="d.pending" />
             <span class="text-[13px] text-ink-mute">{{ date(d.encounter_date) }} · {{ d.time }} · {{ d.practitioner_name }}</span>
           </div>
         </template>
@@ -153,6 +154,7 @@
 </template>
 
 <script setup>
+import PendingTag from '@/components/PendingTag.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { FormControl, dialog, toast } from 'frappe-ui'
@@ -263,13 +265,15 @@ async function save(finish) {
       name: isNew.value ? undefined : props.name, patient: form.patient, practitioner: form.practitioner,
       symptoms: form.symptoms, diagnoses: form.diagnoses, notes: form.notes, vitals: form.vitals,
       prescriptions: rx.map((r) => ({ medicine: r.medicine, dosage: r.dosage, period: r.period, comment: r.comment })), treatments: form.treatments, finish: finish ? 1 : 0,
-    }, finish ? t('Finish a consultation') : t('Save a draft'), { summary: [lockedName.value || form.patient, form.notes].filter(Boolean).join(' · ') })
+    }, finish ? t('Finish a consultation') : t('Save a draft'), {
+      creates: isNew.value ? 'consultation' : undefined, summary: [lockedName.value || form.patient, form.notes].filter(Boolean).join(' · '),
+      meta: { patient_name: lockedName.value, practitioner_name: doctors.value.find((x) => x.name === form.practitioner)?.practitioner_name },
+    })
     saved(res, finish ? t('Consultation finished') : t('Draft saved'),
       finish ? [rx.length && t('{0} medicine(s) prescribed', rx.length), form.treatments.length && t('{0} treatment(s) asked', form.treatments.length)].filter(Boolean).join(' · ') : '')
     ui.version++
-    // a consultation kept on the device has no page yet: its patient's file shows it as waiting
-    if (res.queued) router.replace({ name: 'patient', params: { name: form.patient } })
-    else if (isNew.value) router.replace({ name: 'consultation', params: { name: res.name } })
+    // a consultation kept on the device opens like any other, tagged as waiting to be sent
+    if (isNew.value) router.replace({ name: 'consultation', params: { name: res.name } })
     else load()
   } catch (e) {
     error.value = e.message

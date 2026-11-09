@@ -75,6 +75,73 @@ function patientRow(i, name) {
   }
 }
 
+const localDate = (ts) => {
+  const d = new Date(ts)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const localTime = (ts) => new Date(ts).toTimeString().slice(0, 5)
+
+function consultationRow(i, name, old = {}) {
+  const d = i.data
+  const m = i.meta || {}
+  const done = Number(d.finish) ? 1 : 0
+  return {
+    ...old, name, patient: d.patient, patient_name: m.patient_name || old.patient_name || d.patient,
+    practitioner: d.practitioner || old.practitioner, practitioner_name: m.practitioner_name || old.practitioner_name || '',
+    encounter_date: old.encounter_date || d.date || localDate(i.at), time: old.time || localTime(i.at),
+    encounter_comment: d.notes || '', docstatus: done, state: done ? 'done' : 'draft',
+    symptoms: d.symptoms || [], diagnoses: d.diagnoses || [],
+    prescription_count: (d.prescriptions || []).length, treatment_count: (d.treatments || []).length, pending: true,
+  }
+}
+
+function vitalsOf(v = {}) {
+  const bp = v.bp_systolic && v.bp_diastolic ? `${v.bp_systolic}/${v.bp_diastolic}` : ''
+  return { temperature: v.temperature || '', pulse: v.pulse || '', bp, respiratory_rate: v.respiratory_rate || '', weight: v.weight || '', height: v.height || '' }
+}
+
+function consultationDetail(i, name, old = {}) {
+  const d = i.data
+  const row = consultationRow(i, name, old)
+  return {
+    ...row,
+    prescriptions: (d.prescriptions || []).map((p) => ({ medicine: p.medicine, medicine_name: p.medicine_name || p.medicine, dosage: p.dosage, period: p.period, comment: p.comment || '', quantity: null, request_status: null })),
+    treatments: (d.treatments || []).map((t) => ({ template: t, service_request: null, status: null, done: false })),
+    vitals: Object.values(d.vitals || {}).some(Boolean) ? vitalsOf(d.vitals) : null,
+  }
+}
+
+function procedureRow(i, name, patientName) {
+  const d = i.data
+  const m = i.meta || {}
+  const done = Number(d.complete) ? 1 : 0
+  return {
+    name, patient: d.patient, patient_name: m.patient_name || patientName || d.patient, procedure_template: d.template, start_date: d.date || localDate(i.at),
+    status: done ? 'Completed' : 'Pending', state: done ? 'done' : 'planned', notes: d.notes || '', docstatus: 1, by: '',
+    items: (d.items || []).map((r) => ({ medicine: r.medicine, medicine_name: (m.medicines || {})[r.medicine] || r.medicine, qty: r.qty, unit: '' })), pending: true,
+  }
+}
+
+function movementRows(items, filter = {}) {
+  const rows = []
+  const push = (i, direction, medicine, qty, reason, recipient) => {
+    if (filter.kind && filter.kind !== 'all' && filter.kind !== direction) return
+    if (filter.medicine && filter.medicine !== medicine) return
+    rows.push({
+      date: localDate(i.at), creation: new Date(i.at).toISOString(), medicine, medicine_name: (i.meta || {}).medicine_name || medicine, qty: num(qty), unit: '',
+      batch: '', entry: '', owner: '', reason, recipient: recipient || null, type: direction === 'in' ? 'Material Receipt' : 'Material Issue',
+      se_status: 0, balance: null, cancelled: false, direction, by: '', pending: true,
+    })
+  }
+  for (const i of items) {
+    const m = short(i.method)
+    if (m === 'add_stock') push(i, 'in', i.data.medicine, i.data.qty, 'Received')
+    else if (m === 'give_out') push(i, 'out', i.data.medicine, i.data.qty, i.data.reason, i.data.recipient)
+    else if (m === 'record_procedure' && Number(i.data.complete)) for (const r of i.data.items || []) push(i, 'out', r.medicine, r.qty, 'Used in a procedure', (i.meta || {}).patient_name)
+  }
+  return rows.reverse()
+}
+
 // a change names its medicine by code or by name (the same text for medicines made here)
 const deltaFor = (d, code, name) => (d[code] || 0) + (name !== code ? d[name] || 0 : 0)
 
@@ -111,7 +178,8 @@ export function overlay(method, params, data, outbox) {
       let m = data ? { ...data } : { ...medicineRow(created, code), movements: [], batches: [] }
       if (edit) Object.assign(m, { name: edit.data.name, category: edit.data.category, form: edit.data.form || '', strength: edit.data.strength || '', location: edit.data.location || '', minimum: num(edit.data.minimum) })
       if (n) m = withStatus({ ...m, stock: Math.max(0, num(m.stock) + n) })
-      return { ...m, pending: true }
+      const own = movementRows(items.filter((i) => [code, m.name].includes(i.data.medicine) || (i.data.items || []).some((r) => [code, m.name].includes(r.medicine))), {}).filter((r) => [code, m.name].includes(r.medicine))
+      return { ...m, movements: [...own, ...(m.movements || [])], pending: true }
     }
     case 'patients': {
       if (!Array.isArray(data)) return data
@@ -132,6 +200,19 @@ export function overlay(method, params, data, outbox) {
       if (!data && !created) return data
       let p = data ? { ...data } : { ...patientRow(created, name), procedures: [], consultations: [], prescriptions: [], treatments_requested: [], vitals: [] }
       if (edit) Object.assign(p, { ...patientRow(edit, name), procedures: p.procedures, consultations: p.consultations, prescriptions: p.prescriptions, treatments_requested: p.treatments_requested, vitals: p.vitals, creation: p.creation })
+      const saves = items.filter((i) => short(i.method) === 'save_consultation')
+      const fixes = items.filter((i) => short(i.method) === 'update_consultation')
+      p.consultations = [
+        ...saves.filter((i) => !i.data.name && i.data.patient === name).map((i) => consultationRow(i, i.localId, { patient_name: p.patient_name })).reverse(),
+        ...(p.consultations || []).map((r) => {
+          const e = saves.filter((x) => x.data.name === r.name).pop()
+          const f = fixes.filter((x) => x.data.name === r.name).pop()
+          const row = e ? consultationRow(e, r.name, r) : r
+          return f ? { ...row, encounter_comment: f.data.notes || '', symptoms: f.data.symptoms || [], diagnoses: f.data.diagnoses || [], pending: true } : row
+        }),
+      ]
+      const recorded = items.filter((i) => short(i.method) === 'record_procedure' && i.data.patient === name)
+      p.procedures = [...recorded.map((i) => procedureRow(i, i.localId || i.id, p.patient_name)).reverse(), ...(p.procedures || [])]
       const moved = items.filter((i) => ['complete_procedure', 'cancel_procedure'].includes(short(i.method)))
       if (moved.length && p.procedures) {
         p.procedures = p.procedures.map((r) => {
@@ -140,6 +221,32 @@ export function overlay(method, params, data, outbox) {
         })
       }
       return { ...p, pending: true }
+    }
+    case 'consultation': {
+      const name = params.name
+      const saves = items.filter((i) => short(i.method) === 'save_consultation')
+      const created = saves.find((i) => !i.data.name && i.localId === name)
+      if (!data && !created) return data
+      if (created) return consultationDetail(created, name)
+      const e = saves.filter((x) => x.data.name === name).pop()
+      const f = items.filter((x) => short(x.method) === 'update_consultation' && x.data.name === name).pop()
+      let c = data
+      if (e) c = consultationDetail(e, name, data)
+      if (f) c = { ...c, practitioner: f.data.practitioner || c.practitioner, encounter_comment: f.data.notes || '', symptoms: f.data.symptoms || [], diagnoses: f.data.diagnoses || [], pending: true }
+      return c
+    }
+    case 'movements': {
+      if (!Array.isArray(data)) return data
+      const mine = movementRows(items, { kind: params.kind, medicine: params.medicine })
+      return [...mine, ...data].slice(0, Number(params.limit) || 1000)
+    }
+    case 'dashboard': {
+      if (!data?.counts) return data
+      const deltas = stockDeltas(items)
+      const units = Object.values(deltas).reduce((a, b) => a + b, 0)
+      const fresh = items.filter((i) => short(i.method) === 'save_medicine' && !i.data.code).length
+      const asks = items.filter((i) => short(i.method) === 'request_stock' && !i.data.name).length
+      return { ...data, counts: { ...data.counts, units: Math.max(0, num(data.counts.units) + units), medicines: num(data.counts.medicines) + fresh, pending: num(data.counts.pending) + asks }, pending_changes: items.length }
     }
     case 'boot': {
       const made = items.filter((i) => short(i.method) === 'add_category').map((i) => i.data.name)

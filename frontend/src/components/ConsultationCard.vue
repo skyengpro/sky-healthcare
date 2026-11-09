@@ -9,7 +9,7 @@
             <h3 class="truncate text-[15px] font-semibold text-ink">{{ showPatient ? c.patient_name : date(c.encounter_date) + (c.time ? ' · ' + c.time : '') }}</h3>
             <p class="mt-0.5 text-[12.5px] text-ink-mute">{{ showPatient ? date(c.encounter_date) + (c.time ? ' · ' + c.time : '') + ' · ' : '' }}{{ c.practitioner_name }}</p>
           </div>
-          <StatusBadge :status="c.state" />
+          <span class="flex items-center gap-1.5"><PendingTag :show="c.pending" /><StatusBadge :status="c.state" /></span>
         </div>
         <div v-if="c.symptoms.length || c.diagnoses.length" class="mt-2.5 flex flex-wrap gap-1.5">
           <span v-for="s in c.symptoms" :key="'s' + s" class="rounded-full bg-paper-deep px-2.5 py-0.5 text-[12px] text-ink-soft">{{ s }}</span>
@@ -28,6 +28,7 @@
 <script setup>
 import Initials from './Initials.vue'
 import StatusBadge from './StatusBadge.vue'
+import PendingTag from './PendingTag.vue'
 import { t } from '@/i18n'
 import { date } from '@/format'
 

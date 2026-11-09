@@ -10,6 +10,7 @@
             <span v-if="detail" class="ml-1 opacity-80">{{ detail }}</span>
           </span>
           <Btn v-if="view === 'auth'" size="sm" variant="secondary" :label="t('Sign in')" @click="signIn" />
+          <Btn v-else-if="view === 'failed'" size="sm" variant="secondary" :label="t('Review')" @click="ui.sync.open = true" />
         </div>
       </div>
     </div>
@@ -19,8 +20,11 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import Btn from './Btn.vue'
+import { toast } from 'frappe-ui'
 import { net } from '@/api'
+import { date } from '@/format'
 import { t } from '@/i18n'
+import { ui } from '@/ui'
 
 const tone = {
   // offline is a normal state here, so it is calm and neutral rather than an alarm
@@ -29,6 +33,7 @@ const tone = {
   synced: 'border-apo/20 bg-apo-soft text-apo',
   back: 'border-apo/20 bg-apo-soft text-apo',
   auth: 'border-alert/20 bg-alert-soft text-alert',
+  failed: 'border-alert/20 bg-alert-soft text-alert',
 }
 const icon = {
   offline: 'lucide-wifi-off',
@@ -36,9 +41,15 @@ const icon = {
   synced: 'lucide-circle-check',
   back: 'lucide-wifi',
   auth: 'lucide-log-in',
+  failed: 'lucide-triangle-alert',
 }
 
 const waiting = computed(() => net.outbox.filter((i) => i.status === 'waiting' || i.status === 'sending').length)
+const failed = computed(() => net.outbox.filter((i) => i.status === 'failed').length)
+// tell the person once when a change is refused, with a way to see why
+watch(failed, (n, before) => {
+  if (n > before) toast.error(t('{0} change(s) could not be sent', n), { description: t('Open the list to see why, then try again or discard.') })
+})
 
 // a short loss of signal is not worth a message: "offline" is shown once it lasts
 const offlineShown = ref(false)
@@ -74,6 +85,7 @@ const phase = computed(() => {
   if (net.syncing || waiting.value) return 'syncing'
   if (synced.value) return 'synced'
   if (back.value) return 'back'
+  if (failed.value) return 'failed'
   return null
 })
 // keep the last message while the bar slides away, so the text does not vanish before the bar does
@@ -88,12 +100,16 @@ const title = computed(
       synced: t('All changes are sent.'),
       back: t('Back online.'),
       auth: t('Your session ended.'),
+      failed: t('{0} change(s) could not be sent.', failed.value),
     })[view.value],
 )
 const detail = computed(() => {
   const n = waiting.value
+  // what the screens show while offline comes from the copy on the device: say how old it is
+  const stamp = net.freshAt ? ' ' + t('Data from {0}.', date(new Date(net.freshAt), { dateStyle: 'short', timeStyle: 'short' })) : ''
   return {
-    offline: n ? t('{0} change(s) saved on this device, sent automatically later.', n) : t('Everything you do is saved on this device and sent when you are back online.'),
+    offline: (n ? t('{0} change(s) saved on this device, sent automatically later.', n) : t('Everything you do is saved on this device and sent when you are back online.')) + stamp,
+    failed: t('The server refused them. Review to try again or discard.'),
     syncing: t('Sending {0} change(s)…', n || 1),
     synced: '',
     back: '',

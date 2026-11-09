@@ -9,6 +9,7 @@
         <template #meta>
           <div class="mt-3 flex flex-wrap items-center gap-2.5 text-[13px] text-ink-mute">
             <StatusBadge :status="m.status" />
+            <PendingTag :show="m.pending" />
             <span>{{ t(m.category) }}</span>
             <span v-if="m.form || m.strength" class="text-ink-faint">·</span>
             <span v-if="m.form || m.strength">{{ [m.strength, t(m.form || '')].filter(Boolean).join(' · ') }}</span>
@@ -112,6 +113,7 @@
 </template>
 
 <script setup>
+import PendingTag from '@/components/PendingTag.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { toast, dialog } from 'frappe-ui'
 import { useRouter } from 'vue-router'

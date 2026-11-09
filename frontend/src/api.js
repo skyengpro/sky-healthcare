@@ -16,9 +16,14 @@ import { t } from './i18n'
 
 const LEGACY_OUTBOX = 'sky_healthcare.outbox'
 const LEGACY_CACHE = 'sky_healthcare.cache:'
+const OUTBOX_BACKUP = 'sky_healthcare.outbox.backup'
 const READ_TIMEOUT = 15000
 const OFFLINE_READ_TIMEOUT = 3000
 const WRITE_TIMEOUT = 25000
+// on a slow connection the copy kept on the device is shown after this long, and updated when the answer arrives
+const SLOW_READ = 2500
+// a change the server could not process right now (server error, busy) is tried again, then reported
+const MAX_ATTEMPTS = 6
 
 export const net = reactive({
   online: navigator.onLine,
@@ -29,6 +34,8 @@ export const net = reactive({
   user: null,
   authNeeded: false, // the session ended while changes were waiting: sign in again to send them
   syncedAt: 0, // when the last batch of changes was sent (drives the "all synced" message)
+  wroteAt: 0, // when a change last went through (a screen must not show an older copy right after)
+  freshAt: 0, // when data was last read from the server (shown while offline: "updated at 14:32")
 })
 
 export class ApiError extends Error {
@@ -47,7 +54,14 @@ export class OfflineError extends Error {
 
 // ------------------------------------------------------------------ storage
 
-const saveOutbox = () => idb.set('meta', 'outbox', JSON.parse(JSON.stringify(net.outbox)))
+// kept in IndexedDB, and in localStorage too: if one of them is unavailable, the waiting changes are not lost
+const saveOutbox = () => {
+  const copy = JSON.parse(JSON.stringify(net.outbox))
+  idb.set('meta', 'outbox', copy)
+  try {
+    localStorage.setItem(OUTBOX_BACKUP, JSON.stringify(copy))
+  } catch {}
+}
 const saveIds = () => idb.set('meta', 'ids', { ...net.ids })
 const cacheSet = (key, value) => idb.set('cache', key, value)
 const cacheGet = async (key) => (await idb.get('cache', key)) // undefined when never read
@@ -61,7 +75,13 @@ export async function clearCache() {
 export const ready = (async () => {
   try {
     net.outbox = (await idb.get('meta', 'outbox')) || []
+    // the backup holds changes the other store lost (for example IndexedDB was cleared but not localStorage)
+    try {
+      const backup = JSON.parse(localStorage.getItem(OUTBOX_BACKUP) || '[]')
+      net.outbox.push(...backup.filter((b) => !net.outbox.some((n) => n.id === b.id)))
+    } catch {}
     net.ids = (await idb.get('meta', 'ids')) || {}
+    net.freshAt = (await idb.get('meta', 'freshAt')) || 0
     // changes kept by an older version of the app (localStorage)
     const old = JSON.parse(localStorage.getItem(LEGACY_OUTBOX) || '[]')
     if (old.length) {
@@ -200,9 +220,25 @@ export async function get(method, params = {}) {
     throw new ApiError('This is not available yet. It appears once your changes are sent.', 404, 'DoesNotExistError')
   }
   try {
-    const data = await request(url, { headers: { Accept: 'application/json' } }, net.online ? READ_TIMEOUT : OFFLINE_READ_TIMEOUT)
-    cacheSet(url, data)
-    return show(data)
+    const fetching = request(url, { headers: { Accept: 'application/json' } }, net.online ? READ_TIMEOUT : OFFLINE_READ_TIMEOUT).then((data) => {
+      if (Date.now() - net.freshAt > 10000) idb.set('meta', 'freshAt', Date.now())
+      net.freshAt = Date.now()
+      cacheSet(url, data)
+      return data
+    })
+    fetching.catch(() => {}) // the failure is handled below; this only keeps an early return from leaving it unhandled
+    const cached = await cacheGet(url)
+    // slow connection: show the copy kept on the device now, and refresh the screen when the answer comes
+    if (cached !== undefined && net.online && Date.now() - net.wroteAt > 60000) {
+      const slow = Symbol('slow')
+      const first = await Promise.race([fetching, new Promise((r) => setTimeout(() => r(slow), SLOW_READ))])
+      if (first === slow) {
+        fetching.then((fresh) => JSON.stringify(fresh) !== JSON.stringify(cached) && changed()).catch(() => {})
+        return show(cached)
+      }
+      return show(first)
+    }
+    return show(await fetching)
   } catch (e) {
     if (e instanceof OfflineError) {
       const cached = await cacheGet(url)
@@ -258,6 +294,7 @@ const waiting = () => net.outbox.some((i) => i.status === 'waiting' || i.status 
  * opts.idField  which field of the server's answer holds the new record's id (default "name")
  * opts.stub     (localId) => fields to put in the stand-in answer, for example the patient's name
  * opts.summary  a short line shown in the list of waiting changes
+ * opts.meta     names to show for the waiting change (not sent to the server)
  */
 export async function write(method, data, label, opts = {}) {
   const item = {
@@ -266,6 +303,8 @@ export async function write(method, data, label, opts = {}) {
     data: resolve({ ...data, client_id: uuid() }),
     label,
     summary: opts.summary || '',
+    meta: opts.meta || undefined, // names shown for the change while it waits (patient, doctor, medicines)
+    attempts: 0,
     at: Date.now(),
     user: net.user,
     status: 'waiting',
@@ -274,15 +313,10 @@ export async function write(method, data, label, opts = {}) {
   const stand = () => ({ queued: true, ...(item.localId ? { [item.idField]: item.localId, name: item.localId } : {}), ...(opts.stub ? opts.stub(item.localId, item.data) : {}) })
 
   // a change to a record that only exists on this device (not sent yet) is folded into the change that creates it
-  const ref = [data.name, data.code].find(isLocal)
-  const target = ref && net.outbox.find((i) => i.localId === ref && i.status === 'waiting' && i.method === method)
-  if (target) {
-    const { name, code, client_id, ...rest } = item.data
-    Object.assign(target.data, rest)
-    if (item.summary) target.summary = item.summary
-    saveOutbox()
+  const folded = foldIntoPending(method, item.data)
+  if (folded) {
     changed()
-    return { queued: true, name: target.localId, [target.idField]: target.localId, ...(opts.stub ? opts.stub(target.localId, target.data) : {}) }
+    return { queued: true, name: folded.localId, [folded.idField]: folded.localId, ...(opts.stub ? opts.stub(folded.localId, folded.data) : {}) }
   }
   // behind other waiting changes, or with no connection: wait in line (keeps the order of what was done)
   if (!net.online || waiting()) {
@@ -291,6 +325,7 @@ export async function write(method, data, label, opts = {}) {
   }
   try {
     const res = await post(method, item.data)
+    net.wroteAt = Date.now()
     return res
   } catch (e) {
     if (e instanceof OfflineError) {
@@ -299,6 +334,27 @@ export async function write(method, data, label, opts = {}) {
     }
     throw e
   }
+}
+
+const short = (m) => String(m || '').split('.').pop()
+
+/**
+ * A change to something that was made offline and is not sent yet does not need its own entry:
+ * it is applied to the waiting change that creates it (edit, finish, complete), or removes it (cancel, discard).
+ */
+function foldIntoPending(method, data) {
+  const ref = [data.name, data.code].find(isLocal)
+  const target = ref && net.outbox.find((i) => i.localId === ref && i.status === 'waiting')
+  if (!target) return null
+  const m = short(method)
+  const base = short(target.method)
+  const { name, code, client_id, ...rest } = data
+  if (m === base || (m === 'update_consultation' && base === 'save_consultation')) Object.assign(target.data, rest)
+  else if (m === 'complete_procedure' && base === 'record_procedure') target.data.complete = 1
+  else if ((m === 'cancel_procedure' && base === 'record_procedure') || (m === 'discard_consultation' && base === 'save_consultation')) discard(target.id)
+  else return null
+  saveOutbox()
+  return target
 }
 
 function enqueue(item) {
@@ -320,11 +376,21 @@ async function sessionEnded(e) {
   }
 }
 
+const transient = (e) => e instanceof ApiError && (e.status >= 500 || [408, 429].includes(e.status))
+let retryTimer = null
+
 /** Send everything in the outbox, oldest first. Stops at the first network failure. */
 export async function flush() {
   if (net.syncing || !net.online || net.authNeeded || !net.outbox.some((i) => i.status === 'waiting')) return 0
+  // two tabs of the app must not send the same changes at the same time
+  if (navigator.locks) return (await navigator.locks.request('sky_healthcare.flush', { ifAvailable: true }, (lock) => (lock ? run() : 0))) || 0
+  return run()
+}
+
+async function run() {
   net.syncing = true
   let sent = 0
+  let again = false
   try {
     for (const item of [...net.outbox]) {
       if (item.status !== 'waiting') continue
@@ -337,20 +403,23 @@ export async function flush() {
           saveIds()
         }
         net.outbox = net.outbox.filter((i) => i.id !== item.id)
+        net.wroteAt = Date.now()
         sent++
       } catch (e) {
-        if (e instanceof OfflineError) {
-          item.status = 'waiting'
-          break
-        }
+        item.status = 'waiting'
+        if (e instanceof OfflineError) break
         if (await sessionEnded(e)) {
-          item.status = 'waiting'
           net.authNeeded = true
           break
         }
+        if (transient(e) && (item.attempts = (item.attempts || 0) + 1) < MAX_ATTEMPTS) {
+          // the server is busy or had an error: keep the order, try again in a moment
+          again = true
+          break
+        }
         // refused by the server (for example the stock was already used): it stays, with the reason
-        Object.assign(item, { status: 'failed', error: e.message })
-        net.outbox.forEach((o) => o.status === 'waiting' && JSON.stringify(o.data).includes(item.localId || '\0') && Object.assign(o, { status: 'failed', error: 'It depends on a change that could not be sent.' }))
+        Object.assign(item, { status: 'failed', error: transient(e) ? t('The server could not process this change. Try again later.') : e.message })
+        net.outbox.forEach((o) => o.status === 'waiting' && item.localId && JSON.stringify(o.data).includes(item.localId) && Object.assign(o, { status: 'failed', error: t('It depends on a change that could not be sent.') }))
       }
       saveOutbox()
     }
@@ -362,7 +431,12 @@ export async function flush() {
     net.syncedAt = Date.now()
     changed()
   }
-  if (net.online && net.outbox.some((i) => i.status === 'waiting')) setTimeout(flush, 500)
+  const pending = net.online && net.outbox.some((i) => i.status === 'waiting')
+  if (pending) {
+    clearTimeout(retryTimer)
+    const attempts = Math.max(...net.outbox.filter((i) => i.status === 'waiting').map((i) => i.attempts || 0))
+    retryTimer = setTimeout(flush, again ? Math.min(2000 * 2 ** attempts, 60000) : 500)
+  }
   return sent
 }
 
@@ -370,7 +444,7 @@ export async function flush() {
 export function retry(id) {
   const item = net.outbox.find((i) => i.id === id)
   if (!item) return
-  Object.assign(item, { status: 'waiting', error: undefined })
+  Object.assign(item, { status: 'waiting', error: undefined, attempts: 0 })
   saveOutbox()
   flush()
 }
