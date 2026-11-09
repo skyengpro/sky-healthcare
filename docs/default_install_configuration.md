@@ -37,6 +37,18 @@ Desk forms fill in the practitioner from the signed-in user, which the removed p
 
 The app adds fields to Item, Stock Entry, Material Request, Patient, Patient Encounter, Clinical Procedure and Clinical Procedure Template. They are defined in `sky_healthcare/setup/install.py`.
 
+## Default administrator
+
+The install creates one user with the `Clinic Admin` role, so someone can sign in to the app straight away.
+
+| Email | Password |
+|---|---|
+| `clinic.admin@gmail.com` | `clinicadmin123` |
+
+If a user with this email already exists, the install leaves it unchanged, including its roles and password. A migration never creates this user, so it does not come back after being deleted. A site where the app is already installed does not get it; to add it there, run `bench --site <site> execute sky_healthcare.setup.install.create_default_admin`.
+
+The password is the same on every site and ignores the site's password policy. Change it after the first sign-in.
+
 ## Created when missing
 
 Local changes to these are kept.

@@ -682,21 +682,29 @@ def give_out(
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
 def request_stock(
-	medicine: str,
-	qty: int | float | str,
+	medicine: str | None = None,
+	qty: int | float | str | None = None,
 	urgency: str = "Routine",
 	reason: str | None = None,
 	client_id: str | None = None,
+	items: list | str | None = None,
+	name: str | None = None,
 ):
-	"""Ask for medicine to be ordered. The request waits for a clinic administrator."""
+	"""Ask for medicines to be ordered, or change a request still waiting for a clinic administrator.
+
+	`items` holds the rows ({medicine, qty}). `medicine` and `qty` are the single-row form that
+	devices with an older version of the app can still have waiting to be sent.
+	"""
 	_require_staff()
-	if done := _existing("Material Request", client_id):
+	if not name and (done := _existing("Material Request", client_id)):
 		return {"request": done, "duplicate": True}
-	if flt(qty) <= 0:
-		frappe.throw(_("Quantity must be more than 0"))
+	lines = _request_lines(medicine, qty, items)
 	if urgency not in URGENCY_DAYS:
 		urgency = "Routine"
+	if name:
+		return {"request": _update_request(name, lines, urgency, reason)}
 	need = add_days(nowdate(), URGENCY_DAYS[urgency])
+	warehouse = _warehouse()
 	mr = frappe.get_doc(
 		{
 			"doctype": "Material Request",
@@ -707,13 +715,65 @@ def request_stock(
 			"custom_reason": reason or "",
 			"custom_client_id": client_id,
 			"items": [
-				{"item_code": medicine, "qty": flt(qty), "schedule_date": need, "warehouse": _warehouse()}
+				{
+					"item_code": line["medicine"],
+					"qty": flt(line["qty"]),
+					"schedule_date": need,
+					"warehouse": warehouse,
+				}
+				for line in lines
 			],
 		}
 	)
 	mr.flags.ignore_permissions = True
 	mr.insert()
 	return {"request": mr.name}
+
+
+def _request_lines(medicine, qty, items):
+	lines = frappe.parse_json(items) if items else [{"medicine": medicine, "qty": qty}]
+	seen = set()
+	for line in lines:
+		code = line.get("medicine")
+		if not code:
+			frappe.throw(_("Please choose a medicine on every row."))
+		if flt(line.get("qty")) <= 0:
+			frappe.throw(_("Quantity must be more than 0"))
+		if code in seen:
+			frappe.throw(_("{0} is listed twice. Keep one row and add up the quantity.").format(code))
+		seen.add(code)
+	return lines
+
+
+def _can_edit_request(owner):
+	return owner == _owner() or _is_admin()
+
+
+def _update_request(name, lines, urgency, reason):
+	mr = frappe.get_doc("Material Request", name)
+	if not _can_edit_request(mr.owner):
+		frappe.throw(
+			_("Only the person who created this request or an administrator can change it."),
+			frappe.PermissionError,
+		)
+	if _request_status(mr) != "pending":
+		frappe.throw(_("This request has already been handled."))
+	if urgency != mr.custom_urgency:
+		mr.schedule_date = add_days(nowdate(), URGENCY_DAYS[urgency])
+	mr.custom_urgency = urgency
+	mr.custom_reason = reason or ""
+	# a medicine that stays keeps its row, so a unit chosen in ERPNext is not lost
+	kept = {row.item_code: row for row in mr.items}
+	warehouse = _warehouse()
+	mr.set("items", [])
+	for idx, line in enumerate(lines, 1):
+		row = mr.append(
+			"items", kept.get(line["medicine"]) or {"item_code": line["medicine"], "warehouse": warehouse}
+		)
+		row.update({"idx": idx, "qty": flt(line["qty"]), "schedule_date": mr.schedule_date})
+	mr.flags.ignore_permissions = True
+	mr.save()
+	return mr.name
 
 
 def _request_status(r):
@@ -731,6 +791,26 @@ def _request_status(r):
 	}.get(r.status, "approved")
 
 
+def _request_items(names):
+	if not names:
+		return {}
+	rows = frappe.db.sql(
+		"""
+		select mri.parent, mri.item_code as medicine, i.item_name as medicine_name, mri.qty, mri.uom as unit
+		from `tabMaterial Request Item` mri
+		left join `tabItem` i on i.name = mri.item_code
+		where mri.parent in %(names)s
+		order by mri.parent, mri.idx
+		""",
+		{"names": names},
+		as_dict=True,
+	)
+	out = {}
+	for row in rows:
+		out.setdefault(row.pop("parent"), []).append(row)
+	return out
+
+
 @frappe.whitelist()
 def requests(status: str | None = None, limit: int | str = 100):
 	_require_staff()
@@ -738,20 +818,23 @@ def requests(status: str | None = None, limit: int | str = 100):
 		"""
 		select mr.name, mr.transaction_date as date, mr.schedule_date as needed_by, mr.docstatus, mr.status,
 			mr.custom_urgency as urgency, mr.custom_reason as reason, mr.custom_rejected, mr.custom_decision_note as note,
-			mr.auto_created_via_reorder as automatic, mr.owner, mri.item_code as medicine, i.item_name as medicine_name,
-			mri.qty, mri.stock_uom as unit
+			mr.auto_created_via_reorder as automatic, mr.owner
 		from `tabMaterial Request` mr
-		join `tabMaterial Request Item` mri on mri.parent = mr.name and mri.idx = 1
-		left join `tabItem` i on i.name = mri.item_code
 		where mr.material_request_type = 'Purchase'
 		order by mr.creation desc limit %(limit)s
 		""",
 		{"limit": cint(limit)},
 		as_dict=True,
 	)
+	lines = _request_items([r.name for r in rows])
+	rows = [r for r in rows if lines.get(r.name)]
 	names = _user_names(r.owner for r in rows)
 	for r in rows:
+		r["items"] = lines[r.name]
+		# the first row stands for the request where there is only room for one line
+		r.update(lines[r.name][0])
 		r.state = _request_status(r)
+		r.can_edit = _can_edit_request(r.owner)
 		r.requested_by = _("Automatic (low stock)") if r.automatic else names.get(r.owner, r.owner)
 	if status and status != "all":
 		rows = [r for r in rows if r.state == status]

@@ -17,7 +17,7 @@
     class="w-full"
     @update:model-value="pick"
   >
-    <template #item-suffix="{ option }">
+    <template #item-suffix="{ item: option }">
       <span class="text-xs tabular" :class="option.stock > 0 ? 'text-ink-gray-5' : 'text-ink-red-4'">
         {{ num(option.stock) }} {{ option.unit }}
       </span>
@@ -32,6 +32,10 @@ import { get } from '@/api'
 import { t } from '@/i18n'
 import { num } from '@/format'
 import { ui } from '@/ui'
+
+// the rows of a table load together: they share one call
+let loading_ = null
+const fetchMedicines = () => (loading_ ||= get('medicines').finally(() => (loading_ = null)))
 
 const props = defineProps({ modelValue: String, label: String, required: Boolean, error: String, size: { type: String, default: 'lg' } })
 const emit = defineEmits(['update:modelValue', 'select'])
@@ -57,7 +61,7 @@ function pick(value) {
 async function load() {
   loading.value = true
   try {
-    meds.value = await get('medicines')
+    meds.value = await fetchMedicines()
     if (props.modelValue) emit('select', meds.value.find((m) => m.code === props.modelValue) || null)
   } catch {
   } finally {

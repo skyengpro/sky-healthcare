@@ -27,7 +27,8 @@
       </EmptyState>
     </div>
     <ul v-else class="space-y-2.5">
-      <li v-for="r in paged.items.value" :key="r.name" class="surface p-4 md:p-5">
+      <li v-for="r in paged.items.value" :key="r.name" class="surface cursor-pointer p-4 transition hover:border-line-strong md:p-5"
+        role="button" tabindex="0" @click="viewRequest(r)" @keydown.enter.self="viewRequest(r)">
         <div class="flex flex-wrap items-start gap-4">
           <div class="flex size-11 shrink-0 items-center justify-center rounded-full" :class="urgencyTone(r.urgency, r.automatic)">
             <span :class="r.automatic ? 'lucide-repeat' : 'lucide-clipboard-list'" class="size-[18px]" />
@@ -36,6 +37,7 @@
             <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <span class="text-[15px] font-semibold text-ink">{{ r.medicine_name || r.medicine }}</span>
               <span class="font-display text-[19px] leading-none text-ink-soft tabular">× {{ num(r.qty) }}</span>
+              <span v-if="r.items?.length > 1" class="text-[13px] font-medium text-ink-mute">{{ t('+{0} more', r.items.length - 1) }}</span>
               <span v-if="r.urgency && r.urgency !== 'Routine'" class="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
                 :class="r.urgency === 'Emergency' ? 'bg-alert-soft text-alert' : 'bg-warn-soft text-warn'">{{ t(r.urgency) }}</span>
             </div>
@@ -47,7 +49,7 @@
           </div>
           <div class="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end">
             <StatusBadge :status="r.state" />
-            <div v-if="session.isAdmin && r.state === 'pending'" class="flex gap-2">
+            <div v-if="session.isAdmin && r.state === 'pending'" class="flex gap-2" @click.stop @keydown.enter.stop>
               <Btn size="sm" variant="danger" :label="t('Reject')" @click="decide(r, 'reject')" />
               <Btn size="sm" variant="brand" icon="lucide-check" :label="t('Approve')" @click="decide(r, 'approve')" />
             </div>
@@ -73,7 +75,7 @@ import { get, post } from '@/api'
 import { t } from '@/i18n'
 import { date, num } from '@/format'
 import { session } from '@/session'
-import { ui, changed, openRequest } from '@/ui'
+import { ui, changed, openRequest, viewRequest } from '@/ui'
 
 const route = useRoute()
 const router = useRouter()
@@ -96,7 +98,7 @@ function decide(r, action) {
   const approve = action === 'approve'
   dialog.prompt({
     title: approve ? t('Approve this request?') : t('Reject this request?'),
-    message: `${r.medicine_name} × ${num(r.qty)}`,
+    message: (r.items || [r]).map((i) => `${i.medicine_name} × ${num(i.qty)}`).join(', '),
     theme: approve ? 'green' : 'red',
     confirmLabel: approve ? t('Approve') : t('Reject'),
     fields: [{ name: 'note', label: t('Note (optional)'), type: 'textarea' }],

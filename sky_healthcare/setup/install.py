@@ -2,6 +2,7 @@ import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 ROLES = ["Clinic Staff", "Clinic Admin"]
+DEFAULT_ADMIN = {"email": "clinic.admin@gmail.com", "password": "clinicadmin123"}
 # Site-wide. Re-applied at each migration; docs/default_install_configuration.md explains each one.
 STOCK_SETTINGS = {
 	"enable_serial_and_batch_no_for_item": 1,
@@ -231,7 +232,9 @@ HEALTH_FIELDS = {
 
 
 def after_install():
-	"""First install: everything in `after_migrate`, plus the store."""
+	"""First install: everything in `after_migrate`, plus the default administrator and the store."""
+	create_roles()
+	create_default_admin()
 	after_migrate()
 	if not erpnext_ready():
 		return  # finished by after_setup_wizard once the company exists
@@ -308,6 +311,28 @@ def create_roles():
 		else:
 			# these users work in the app only, never in the ERPNext desk
 			frappe.db.set_value("Role", role, "desk_access", 0)
+
+
+def create_default_admin():
+	"""The first clinic administrator. An existing user with this email is left as it is."""
+	if frappe.db.exists("User", DEFAULT_ADMIN["email"]):
+		return
+	user = frappe.get_doc(
+		{
+			"doctype": "User",
+			"email": DEFAULT_ADMIN["email"],
+			"first_name": "Clinic",
+			"last_name": "Admin",
+			"send_welcome_email": 0,
+			"user_type": "Website User",
+			"roles": [{"role": "Clinic Admin"}],
+		}
+	)
+	user.new_password = DEFAULT_ADMIN["password"]
+	# a site's password policy must not stop the install
+	user.flags.ignore_password_policy = True
+	user.flags.ignore_permissions = True
+	user.insert()
 
 
 def _insert_if_missing(doctype, name, **fields):

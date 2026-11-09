@@ -4,6 +4,7 @@ from unittest.mock import patch
 import frappe
 from frappe.installer import install_app, is_required_by
 from frappe.tests import IntegrationTestCase
+from frappe.utils.password import check_password, update_password
 
 from sky_healthcare import api, health
 from sky_healthcare.setup import install
@@ -119,6 +120,36 @@ class TestMigration(IntegrationTestCase):
 		before = {doctype: frappe.db.count(doctype) for doctype in doctypes}
 		install.after_migrate()
 		self.assertEqual({doctype: frappe.db.count(doctype) for doctype in doctypes}, before)
+
+
+class TestDefaultAdmin(IntegrationTestCase):
+	email = install.DEFAULT_ADMIN["email"]
+
+	def setUp(self):
+		if frappe.db.exists("User", self.email):
+			frappe.delete_doc("User", self.email, force=True, ignore_permissions=True)
+
+	def test_created_with_the_admin_role_and_password_whatever_the_policy(self):
+		refused = {"feedback": {"password_policy_validation_passed": False, "suggestions": []}}
+		with patch("frappe.core.doctype.user.user.test_password_strength", return_value=refused):
+			install.create_default_admin()
+
+		self.assertEqual(frappe.get_roles(self.email).count("Clinic Admin"), 1)
+		self.assertEqual(check_password(self.email, install.DEFAULT_ADMIN["password"]), self.email)
+
+	def test_existing_user_is_left_as_it_is(self):
+		install.create_default_admin()
+		update_password(self.email, "another password 7!")
+		frappe.db.set_value("User", self.email, "first_name", "Renamed")
+
+		install.create_default_admin()
+
+		self.assertEqual(frappe.db.get_value("User", self.email, "first_name"), "Renamed")
+		self.assertEqual(check_password(self.email, "another password 7!"), self.email)
+
+	def test_a_migration_does_not_bring_it_back(self):
+		install.after_migrate()
+		self.assertFalse(frappe.db.exists("User", self.email))
 
 
 class TestConfigurationDocument(IntegrationTestCase):

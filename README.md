@@ -14,7 +14,7 @@ French, works offline for stock work.
 | **Medicines** | list with search and filters; add a medicine with its first stock; **+ Stock** on every row |
 | **Medicine page** | stock, minimum, nearest expiry, batches (oldest first), full history |
 | **Give out stock** | for damaged or expired stock and authorized adjustments; always takes the earliest valid batch |
-| **Medical requests** | staff ask for stock, administrators approve or reject; low stock creates requests automatically |
+| **Medical requests** | staff ask for several medicines in one request and can change it until an administrator approves or rejects it; low stock creates requests automatically |
 | **Patients** | register patients; the patient file gathers timeline, consultations, treatments, prescriptions and vital signs |
 | **Consultations** | started from a patient file: symptoms, vital signs, observations, diagnosis, prescription, treatments to do |
 | **Treatments** | recorded from a patient file; the medicines the treatment uses leave the stock; can be cancelled with a reason, the stock goes back |
