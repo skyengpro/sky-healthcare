@@ -27,6 +27,16 @@ REASONS = (
 CUSTOM_FIELDS = {
 	"Item": [
 		{
+			"fieldname": "custom_client_id",
+			"label": "Client ID",
+			"fieldtype": "Data",
+			"hidden": 1,
+			"read_only": 1,
+			"no_copy": 1,
+			"search_index": 1,
+			"insert_after": "custom_location",
+		},
+		{
 			"fieldname": "custom_dosage_form",
 			"label": "Dosage Form",
 			"fieldtype": "Select",
@@ -165,16 +175,6 @@ HEALTH_FIELDS = {
 			"read_only": 1,
 			"no_copy": 1,
 			"insert_after": "custom_location",
-		},
-		{
-			"fieldname": "custom_client_id",
-			"label": "Client ID",
-			"fieldtype": "Data",
-			"hidden": 1,
-			"read_only": 1,
-			"no_copy": 1,
-			"search_index": 1,
-			"insert_after": "custom_medication",
 		},
 	],
 	"Stock Entry": [
