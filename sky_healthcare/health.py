@@ -369,7 +369,7 @@ def procedure_templates(include_disabled: int | bool | str = 0):
 
 def _by_client_id(doctype, client_id):
 	"""A record this device already sent (a write is sent again when the answer was lost)."""
-	if client_id:
+	if client_id and frappe.db.has_column(doctype, "custom_client_id"):
 		return frappe.db.get_value(doctype, {"custom_client_id": client_id}, "name")
 
 
