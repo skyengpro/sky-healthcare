@@ -9,13 +9,17 @@
 	];
 
 	const fill_practitioner = async (frm) => {
-		if (!frm.is_new() || frm.doc.practitioner || !frappe.model.can_read("Healthcare Practitioner")) {
+		if (
+			!frm.is_new() ||
+			frm.doc.practitioner ||
+			!frappe.model.can_read("Healthcare Practitioner")
+		) {
 			return;
 		}
 		const { message } = await frappe.db.get_value(
 			"Healthcare Practitioner",
 			{ user_id: frappe.session.user, status: "Active" },
-			"name",
+			"name"
 		);
 		if (message && message.name) {
 			frm.set_value("practitioner", message.name);
