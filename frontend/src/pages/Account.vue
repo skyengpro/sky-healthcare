@@ -8,7 +8,7 @@
         <div class="font-display text-[26px] leading-tight text-ink">{{ session.user.full_name }}</div>
         <div class="mt-0.5 truncate text-[13.5px] text-ink-mute">{{ session.user.email }}</div>
         <span class="mt-3 inline-block rounded-full px-2.5 py-1 text-[11.5px] font-semibold" :class="session.isAdmin ? 'bg-ink text-on-ink' : 'bg-apo-soft text-apo-deep'">
-          {{ session.isAdmin ? t('Clinic administrator') : t('Clinic staff') }}</span>
+          {{ session.isAdmin ? t('Clinic Administrator') : t('Clinic Staff') }}</span>
       </div>
     </section>
 

@@ -138,7 +138,7 @@ const staff = await newPage()
 current = staff
 await login(staff, S_USER, S_PW)
 
-// 1. the pharmacist adds a medicine (Item + batch + stock entry, and a Medication in Frappe Health)
+// 1. staff add a medicine (Item + batch + stock entry, and a Medication in Frappe Health)
 await click(staff, 'Medicines', 'a')
 await waitText(staff, 'medicines on your list')
 await click(staff, 'New medicine')

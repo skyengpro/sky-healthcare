@@ -1,6 +1,6 @@
 <template>
   <div>
-    <PageHeader :eyebrow="t('Team')" :title="t('Staff')" :subtitle="session.health ? t('People who can use the app. Each one is also a doctor, so they can run consultations.') : t('People who can use the pharmacy app.')">
+    <PageHeader :eyebrow="t('Team')" :title="t('Staff')" :subtitle="session.health ? t('People who can use the app. Each one is also a doctor, so they can run consultations.') : t('People who can use the app.')">
       <template #actions>
         <Btn variant="primary" icon="lucide-user-plus" :label="t('Add a person')" @click="edit()" />
       </template>

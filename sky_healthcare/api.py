@@ -1,6 +1,6 @@
 """Server API for the Healthcare Management app.
 
-Every function checks the caller's pharmacy role first, then does the stock work with ERPNext on
+Every function checks the caller's app role first, then does the stock work with ERPNext on
 the user's behalf. Staff never need ERPNext permissions of their own, and each write is one
 call, so a dropped connection cannot leave half a record behind.
 
@@ -18,7 +18,7 @@ from frappe.utils import add_days, cint, flt, getdate, nowdate
 
 STAFF_ROLES = ("Clinic Staff", "Clinic Admin", "System Manager")
 ADMIN_ROLES = ("Clinic Admin", "System Manager")
-PHARMACY_ROLES = ("Clinic Staff", "Clinic Admin")
+APP_ROLES = ("Clinic Staff", "Clinic Admin")
 EXPIRY_WARNING_DAYS = 90
 # Why stock may leave without a patient. Medicine for a patient leaves through a procedure ("Used in a procedure").
 # Older entries keep their earlier reasons ("Dispensed to a patient", "Transfer to ...") in the history.
@@ -41,7 +41,7 @@ def _roles():
 
 def _require_staff():
 	if frappe.session.user == "Guest" or not (_roles() & set(STAFF_ROLES)):
-		frappe.throw(_("You do not have access to the pharmacy."), frappe.PermissionError)
+		frappe.throw(_("You do not have access to this app."), frappe.PermissionError)
 
 
 def _require_admin():
@@ -64,12 +64,10 @@ def _company():
 
 def _warehouse():
 	wh = frappe.db.get_value(
-		"Warehouse", {"warehouse_name": "Pharmacy", "is_group": 0, "company": _company()}, "name"
+		"Warehouse", {"warehouse_name": "Medical Store", "is_group": 0, "company": _company()}, "name"
 	)
 	if not wh:
-		frappe.throw(
-			_("The Pharmacy store is not set up. Ask your administrator to finish the installation.")
-		)
+		frappe.throw(_("The Medical Store is not set up. Ask your administrator to finish the installation."))
 	return wh
 
 
@@ -91,11 +89,11 @@ def _as_system():
 	"""Run stock postings with full rights after the role check.
 
 	ERPNext checks permissions deep inside stock posting (batch bundles, ledger entries), and
-	pharmacy users deliberately have no ERPNext permissions. Documents still record the real
+	app users deliberately have no ERPNext permissions. Documents still record the real
 	user, see `record_real_user`, and their change history names them through `audit_user`.
 	"""
 	user = frappe.session.user
-	# the caller already passed the pharmacy role check in `_writes`; the real user is restored below
+	# the caller already passed the app role check in `_writes`; the real user is restored below
 	frappe.set_user("Administrator")  # nosemgrep
 	frappe.session.data.audit_user = user  # shown as "Action taken by" in the change history
 	try:
@@ -105,7 +103,7 @@ def _as_system():
 
 
 def _writes(admin=False):
-	"""Check the caller's pharmacy role, then run the write with full rights (see `_as_system`)."""
+	"""Check the caller's app role, then run the write with full rights (see `_as_system`)."""
 
 	def decorator(fn):
 		@wraps(fn)
@@ -160,7 +158,7 @@ def _existing(doctype, client_id):
 
 
 # Guests must be able to call this: the login screen asks it who is logged in and for a CSRF token.
-# It returns nothing but {"user": None} unless the caller is a pharmacy user.
+# It returns nothing but {"user": None} unless the caller is an app user.
 @frappe.whitelist(allow_guest=True)  # nosemgrep
 def boot():
 	"""Everything the app needs at start. Also returns a fresh CSRF token, so a cached page can still post."""
@@ -528,7 +526,7 @@ def add_stock(
 	lot: str | int | None = None,
 	client_id: str | None = None,
 ):
-	"""Record a delivery: one batch with its expiry date, added to the pharmacy store."""
+	"""Record a delivery: one batch with its expiry date, added to the Medical Store."""
 	_require_staff()
 	if done := _existing("Stock Entry", client_id):
 		return {"stock_entry": done, "duplicate": True}
@@ -1025,7 +1023,7 @@ def staff():
 		"""select distinct u.name, u.full_name, u.email, u.enabled, u.last_login, hr.role
 		from `tabUser` u join `tabHas Role` hr on hr.parent = u.name and hr.parenttype = 'User'
 		where hr.role in %(roles)s order by u.full_name""",
-		{"roles": PHARMACY_ROLES},
+		{"roles": APP_ROLES},
 		as_dict=True,
 	)
 	out = {}
@@ -1045,14 +1043,14 @@ def save_staff(
 	password: str | None = None,
 	enabled: int | bool | str = 1,
 ):
-	"""Create or update a pharmacy user. Administrators can only give the two pharmacy roles."""
+	"""Create or update an app user. Administrators can only give the two app roles."""
 	_require_admin()
-	if role not in PHARMACY_ROLES:
+	if role not in APP_ROLES:
 		frappe.throw(_("Invalid role"))
 	email = (email or "").strip().lower()
 	if frappe.db.exists("User", email):
 		user = frappe.get_doc("User", email)
-		other_roles = [r.role for r in user.roles if r.role not in PHARMACY_ROLES]
+		other_roles = [r.role for r in user.roles if r.role not in APP_ROLES]
 		if other_roles and "System Manager" not in _roles():
 			frappe.throw(
 				_("This user has other access in the system and can only be changed by the system manager.")
@@ -1071,7 +1069,7 @@ def save_staff(
 	user.first_name = parts[0] or email
 	user.last_name = parts[1] if len(parts) > 1 else ""
 	user.enabled = cint(enabled)
-	keep = [r.role for r in user.get("roles", []) if r.role not in PHARMACY_ROLES]
+	keep = [r.role for r in user.get("roles", []) if r.role not in APP_ROLES]
 	user.set("roles", [])
 	for r in [*keep, role]:
 		user.append("roles", {"role": r})
@@ -1080,7 +1078,7 @@ def save_staff(
 	user.flags.ignore_permissions = True
 	user.flags.ignore_password_policy = False
 	user.save()
-	health.sync_practitioner(user.name)  # every pharmacy user is also a doctor profile in Frappe Health
+	health.sync_practitioner(user.name)  # every app user is also a doctor profile in Frappe Health
 	return {"name": user.name}
 
 

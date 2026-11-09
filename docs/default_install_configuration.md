@@ -42,8 +42,8 @@ The app adds fields to Item, Stock Entry, Material Request, Patient, Patient Enc
 Local changes to these are kept.
 
 - Item groups under `Medicine`, the `Clinical Procedures` item group and the units of measure
-- The `Pharmacy` warehouse, on first install only
+- The `Medical Store` warehouse, on first install only
 - Notifications for expiring batches, low stock and new requests
-- A Medication for each medicine and a Healthcare Practitioner for each pharmacy user
+- A Medication for each medicine and a Healthcare Practitioner for each app user
 
 `sky_healthcare.setup.site.setup` is a separate command. Only that command sets the date and number formats and disables public sign-up.

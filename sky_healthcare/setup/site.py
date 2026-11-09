@@ -51,7 +51,7 @@ def setup(config: str | None = None):
 
 	_setup_wizard(cfg.get("company"), cfg.get("admin_user"), report)
 	install.after_install()
-	report["steps"].append("roles, custom fields, categories, units, notifications, Pharmacy store")
+	report["steps"].append("roles, custom fields, categories, units, notifications, Medical Store")
 	_system_settings(cfg.get("company") or {}, report)
 	_dosages(report)
 	_check_inventory_account(report)
@@ -170,7 +170,7 @@ def _check_inventory_account(report):
 
 
 def _user(u):
-	"""A pharmacy user (and their doctor profile), created like the Staff page does."""
+	"""An app user (and their doctor profile), created like the Staff page does."""
 	from sky_healthcare.api import save_staff
 
 	email = u["email"].strip().lower()

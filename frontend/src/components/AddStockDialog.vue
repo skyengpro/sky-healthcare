@@ -1,5 +1,5 @@
 <template>
-  <Sheet v-model:open="ui.addStock.open" :title="t('Add stock')" :message="t('Record medicine that has arrived at the pharmacy.')"
+  <Sheet v-model:open="ui.addStock.open" :title="t('Add stock')" :message="t('Record medicine that has arrived at the clinic.')"
     icon="lucide-package-plus" theme="green" size="lg">
     <form class="grid grid-cols-2 gap-4" @submit.prevent="save">
       <div class="col-span-2">

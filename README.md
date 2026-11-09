@@ -26,12 +26,12 @@ French, works offline for stock work.
 
 ```
 PWA (Vue 3 + frappe-ui)  ->  sky_healthcare.api / .health (Python, in the site)  ->  ERPNext Stock + Frappe Health
-/sky-healthcare                    checks the pharmacy role, one call per action
+/sky-healthcare                    checks the user's role, one call per action
 ```
 
 - **Roles:** `Clinic Staff` and `Clinic Admin`. Neither needs the ERPNext desk. The API checks the
   role, then does the work on the user's behalf, and every record keeps the real user.
-- **Stock side (ERPNext):** Item (medicine), Batch (lot and expiry), Warehouse "Pharmacy", Stock Entry,
+- **Stock side (ERPNext):** Item (medicine), Batch (lot and expiry), Warehouse "Medical Store", Stock Entry,
   Material Request (the app's "medical request"), Stock Ledger.
 - **Care side (Frappe Health):** each medicine is also a Medication linked to its Item; patients are
   Patients; treatment types are Clinical Procedure Templates; treatments are Clinical Procedures;
@@ -102,7 +102,7 @@ deploy, then install the app on the site.
 
 After installing the apps, one command does every setup step: the ERPNext setup wizard (company,
 country, currency), roles, custom fields, medicine categories, units, dosage forms, dosages and
-durations, notifications, the Pharmacy store, local date format, no public sign-up, the users (each also
+durations, notifications, the Medical Store, local date format, no public sign-up, the users (each also
 gets a doctor profile), and optionally a starting list of medicines with their stock and the treatment
 types.
 

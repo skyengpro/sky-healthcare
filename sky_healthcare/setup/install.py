@@ -255,7 +255,7 @@ def after_migrate():
 
 
 def setup_health():
-	"""Link the pharmacy to Frappe Health: custom fields, and a Medication for every medicine."""
+	"""Link the app to Frappe Health: custom fields, and a Medication for every medicine."""
 	from sky_healthcare.health import (
 		configure_appointment_type,
 		has_health,
@@ -306,7 +306,7 @@ def create_roles():
 				ignore_permissions=True
 			)
 		else:
-			# pharmacy users only use the app, never the ERPNext desk
+			# these users work in the app only, never in the ERPNext desk
 			frappe.db.set_value("Role", role, "desk_access", 0)
 
 
@@ -338,7 +338,7 @@ def default_company():
 
 
 def create_warehouse(company=None):
-	"""Create the "Pharmacy" store for a company (default company if none given).
+	"""Create the "Medical Store" warehouse for a company (default company if none given).
 
 	Run by hand for another company: bench --site <site> execute sky_healthcare.setup.install.create_warehouse --kwargs "{'company': 'X'}"
 	"""
@@ -354,12 +354,12 @@ def create_warehouse(company=None):
 			"Set one in the Company, or disable perpetual inventory, before recording stock."
 		)
 	abbr = frappe.db.get_value("Company", company, "abbr")
-	name = f"Pharmacy - {abbr}"
+	name = f"Medical Store - {abbr}"
 	if not frappe.db.exists("Warehouse", name):
 		warehouse = frappe.get_doc(
 			{
 				"doctype": "Warehouse",
-				"warehouse_name": "Pharmacy",
+				"warehouse_name": "Medical Store",
 				"company": company,
 				"parent_warehouse": f"All Warehouses - {abbr}",
 			}

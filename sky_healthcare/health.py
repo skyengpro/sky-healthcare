@@ -1,15 +1,15 @@
 """Patients and clinical procedures, stored in Frappe Health (the `healthcare` app).
 
-The pharmacy keeps one record per medicine in each module:
+The app keeps one record per medicine in each module:
 
 - ERPNext Stock: the Item, its batches and every stock movement (see `api.py`).
 - Frappe Health: a Medication linked to that Item, so doctors and nurses find the same medicine
-  in prescriptions and procedures. `sync_medication` keeps it in step whenever the pharmacy adds,
+  in prescriptions and procedures. `sync_medication` keeps it in step whenever the clinic adds,
   edits, archives or brings back a medicine.
 
 A clinical procedure is done for a patient from a template (e.g. "Wound dressing"). The template
-lists the medicines it uses. Completing the procedure takes those medicines out of the pharmacy
-store with the same rules as a stock out: valid batches only, earliest expiry first.
+lists the medicines it uses. Completing the procedure takes those medicines out of the Medical
+Store with the same rules as a stock out: valid batches only, earliest expiry first.
 """
 
 import json
@@ -80,7 +80,7 @@ def _parse_strength(text, fallback_uom="mg"):
 	"""'500mg' -> (500.0, 'mg'). No strength written -> (0, the medicine's own unit, e.g. 'Tablet').
 
 	Frappe Health requires a strength and a unit on every Medication; with no strength the unit the
-	pharmacy counts in is shown, instead of an unrelated "mg".
+	clinic counts in is shown, instead of an unrelated "mg".
 	"""
 	m = re.match(r"^\s*([\d.,]+)\s*([a-zA-Zµ%]+)?", text or "")
 	if not m:
@@ -95,10 +95,10 @@ def _medication_of(code):
 
 
 def sync_medication(code):
-	"""Create or update the Frappe Health Medication for a pharmacy medicine (an ERPNext Item).
+	"""Create or update the Frappe Health Medication for a medicine (an ERPNext Item).
 
 	Written straight to the database on update: Medication's own save hooks rename the Item and
-	create prices, which the pharmacy does not want.
+	create prices, which the clinic does not want.
 	"""
 	if not has_health() or not frappe.db.exists("Item", code):
 		return None
@@ -171,7 +171,7 @@ def remove_medication(code, delete=False):
 
 
 def sync_all_medications():
-	"""Give every pharmacy medicine its Medication (after an update, or after installing Frappe Health)."""
+	"""Give every medicine its Medication (after an update, or after installing Frappe Health)."""
 	from sky_healthcare.api import _medicine_groups
 
 	groups = _medicine_groups()
@@ -497,7 +497,7 @@ def procedures(patient: str | None = None, status: str | None = None, limit: int
 
 
 def _complete(cp):
-	"""Take the procedure's medicines out of the pharmacy store, then mark it completed."""
+	"""Take the procedure's medicines out of the Medical Store, then mark it completed."""
 	if cp.status == "Completed":
 		return frappe.db.get_value(
 			"Stock Entry", {"custom_clinical_procedure": cp.name, "docstatus": 1}, "name"
@@ -682,9 +682,9 @@ VITALS = ("temperature", "pulse", "respiratory_rate", "bp_systolic", "bp_diastol
 
 
 def sync_practitioner(user):
-	"""Every pharmacy user is also a Healthcare Practitioner, so any of them can run a consultation.
+	"""Every app user is also a Healthcare Practitioner, so any of them can run a consultation.
 
-	Called when a user is created or changed in the app, and for all pharmacy users on update.
+	Called when a user is created or changed in the app, and for all app users on update.
 	"""
 	if not has_health() or not frappe.db.exists("User", user):
 		return None
