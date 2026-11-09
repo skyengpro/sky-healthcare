@@ -1,15 +1,15 @@
 """Patients and clinical procedures, stored in Frappe Health (the `healthcare` app).
 
-The pharmacy keeps one record per medicine in each module:
+The app keeps one record per medicine in each module:
 
 - ERPNext Stock: the Item, its batches and every stock movement (see `api.py`).
 - Frappe Health: a Medication linked to that Item, so doctors and nurses find the same medicine
-  in prescriptions and procedures. `sync_medication` keeps it in step whenever the pharmacy adds,
+  in prescriptions and procedures. `sync_medication` keeps it in step whenever the clinic adds,
   edits, archives or brings back a medicine.
 
 A clinical procedure is done for a patient from a template (e.g. "Wound dressing"). The template
-lists the medicines it uses. Completing the procedure takes those medicines out of the pharmacy
-store with the same rules as a stock out: valid batches only, earliest expiry first.
+lists the medicines it uses. Completing the procedure takes those medicines out of the Medical
+Store with the same rules as a stock out: valid batches only, earliest expiry first.
 """
 
 import json
@@ -23,7 +23,6 @@ from sky_healthcare.api import (
 	_allocate,
 	_company,
 	_existing,
-	_keep_owner,
 	_owner,
 	_require_staff,
 	_submit,
@@ -81,7 +80,7 @@ def _parse_strength(text, fallback_uom="mg"):
 	"""'500mg' -> (500.0, 'mg'). No strength written -> (0, the medicine's own unit, e.g. 'Tablet').
 
 	Frappe Health requires a strength and a unit on every Medication; with no strength the unit the
-	pharmacy counts in is shown, instead of an unrelated "mg".
+	clinic counts in is shown, instead of an unrelated "mg".
 	"""
 	m = re.match(r"^\s*([\d.,]+)\s*([a-zA-Zµ%]+)?", text or "")
 	if not m:
@@ -96,10 +95,10 @@ def _medication_of(code):
 
 
 def sync_medication(code):
-	"""Create or update the Frappe Health Medication for a pharmacy medicine (an ERPNext Item).
+	"""Create or update the Frappe Health Medication for a medicine (an ERPNext Item).
 
 	Written straight to the database on update: Medication's own save hooks rename the Item and
-	create prices, which the pharmacy does not want.
+	create prices, which the clinic does not want.
 	"""
 	if not has_health() or not frappe.db.exists("Item", code):
 		return None
@@ -172,7 +171,7 @@ def remove_medication(code, delete=False):
 
 
 def sync_all_medications():
-	"""Give every pharmacy medicine its Medication (after an update, or after installing Frappe Health)."""
+	"""Give every medicine its Medication (after an update, or after installing Frappe Health)."""
 	from sky_healthcare.api import _medicine_groups
 
 	groups = _medicine_groups()
@@ -300,11 +299,8 @@ def save_patient(
 		doc.update(fields)
 		doc.save(ignore_permissions=True)
 	else:
-		doc = frappe.get_doc(
-			{"doctype": "Patient", "owner": _owner(), "custom_client_id": client_id, **fields}
-		)
+		doc = frappe.get_doc({"doctype": "Patient", "custom_client_id": client_id, **fields})
 		doc.insert(ignore_permissions=True)
-		_keep_owner(doc)
 	return {"name": doc.name, "patient_name": doc.patient_name}
 
 
@@ -422,7 +418,6 @@ def save_procedure_template(
 	doc = frappe.get_doc(
 		{
 			"doctype": "Clinical Procedure Template",
-			"owner": _owner(),
 			"custom_client_id": client_id,
 			"template": template,
 			"item_code": item_code,
@@ -434,7 +429,6 @@ def save_procedure_template(
 		}
 	)
 	doc.insert(ignore_permissions=True)
-	_keep_owner(doc)
 	return {"name": doc.name}
 
 
@@ -503,7 +497,7 @@ def procedures(patient: str | None = None, status: str | None = None, limit: int
 
 
 def _complete(cp):
-	"""Take the procedure's medicines out of the pharmacy store, then mark it completed."""
+	"""Take the procedure's medicines out of the Medical Store, then mark it completed."""
 	if cp.status == "Completed":
 		return frappe.db.get_value(
 			"Stock Entry", {"custom_clinical_procedure": cp.name, "docstatus": 1}, "name"
@@ -535,7 +529,6 @@ def _complete(cp):
 			frappe.get_doc(
 				{
 					"doctype": "Stock Entry",
-					"owner": _owner(),
 					"stock_entry_type": "Material Issue",
 					"company": cp.company,
 					"set_posting_time": 1,
@@ -607,7 +600,6 @@ def record_procedure(
 	cp = frappe.get_doc(
 		{
 			"doctype": "Clinical Procedure",
-			"owner": _owner(),
 			"patient": patient,
 			"procedure_template": template,
 			"patient_name": frappe.db.get_value("Patient", patient, "patient_name"),
@@ -624,7 +616,6 @@ def record_procedure(
 	cp.flags.ignore_permissions = True
 	cp.insert()
 	cp.submit()
-	_keep_owner(cp)
 	entry = _complete(cp) if cint(complete) else None
 	if service_request and cint(complete):
 		frappe.db.set_value("Service Request", service_request, "status", "completed-Request Status")
@@ -654,7 +645,7 @@ def complete_procedure(name: str):
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
 def cancel_procedure(name: str, reason: str | None = None):
-	"""Cancel a procedure (pharmacy staff and administrators).
+	"""Cancel a procedure (clinic staff and administrators).
 
 	A planned one is simply cancelled. A completed one needs a reason: its stock movement is cancelled
 	too, so the medicines go back into the same batches. The original movement stays in the history,
@@ -684,15 +675,16 @@ def cancel_procedure(name: str, reason: str | None = None):
 # ------------------------------------------------------------------ doctors (Healthcare Practitioner)
 
 APPOINTMENT_TYPE = "Consultation"
+APPOINTMENT_TYPE_SETTINGS = {"allow_booking_for": "Practitioner", "default_duration": 20}
 DOSAGES = ["Once Daily", "BID", "TID", "QID", "Once Bedtime"]
 DURATIONS = ["1 Day", "2 Day", "3 Day", "5 Day", "1 Week", "2 Week", "1 Month"]
 VITALS = ("temperature", "pulse", "respiratory_rate", "bp_systolic", "bp_diastolic", "weight", "height")
 
 
 def sync_practitioner(user):
-	"""Every pharmacy user is also a Healthcare Practitioner, so any of them can run a consultation.
+	"""Every app user is also a Healthcare Practitioner, so any of them can run a consultation.
 
-	Called when a user is created or changed in the app, and for all pharmacy users on update.
+	Called when a user is created or changed in the app, and for all app users on update.
 	"""
 	if not has_health() or not frappe.db.exists("User", user):
 		return None
@@ -718,7 +710,7 @@ def sync_practitioner(user):
 def sync_all_practitioners():
 	users = frappe.get_all(
 		"Has Role",
-		filters={"role": ["in", ["Pharmacy Staff", "Pharmacy Admin"]], "parenttype": "User"},
+		filters={"role": ["in", ["Clinic Staff", "Clinic Admin"]], "parenttype": "User"},
 		pluck="parent",
 	)
 	for user in set(users):
@@ -738,11 +730,54 @@ def ensure_appointment_type():
 			{
 				"doctype": "Appointment Type",
 				"appointment_type": APPOINTMENT_TYPE,
-				"allow_booking_for": "Practitioner",
-				"default_duration": 20,
+				**APPOINTMENT_TYPE_SETTINGS,
 			}
 		).insert(ignore_permissions=True)
 	return APPOINTMENT_TYPE
+
+
+def configure_appointment_type():
+	"""Create the default appointment type, and restore it if it was changed on the site."""
+	doc = frappe.get_doc("Appointment Type", ensure_appointment_type())
+	if any(doc.get(field) != value for field, value in APPOINTMENT_TYPE_SETTINGS.items()):
+		doc.update(APPOINTMENT_TYPE_SETTINGS)
+		doc.save(ignore_permissions=True)
+
+
+# Healthcare limits a user linked to a practitioner to that practitioner's records. The care team shares
+# its patients, so that one permission is removed and every practitioner sees what colleagues prescribed.
+
+
+def _remove_practitioner_limit(practitioner, user):
+	"""Remove only the permission Healthcare adds; a permission an administrator scoped stays."""
+	for name in frappe.get_all(
+		"User Permission",
+		filters={
+			"user": user,
+			"allow": "Healthcare Practitioner",
+			"for_value": practitioner,
+			"apply_to_all_doctypes": 1,
+			"is_default": 0,
+		},
+		pluck="name",
+	):
+		frappe.delete_doc(
+			"User Permission", name, ignore_permissions=True, force=True, delete_permanently=True
+		)
+
+
+def open_practitioner_records(doc, method=None):
+	"""`on_update` of Healthcare Practitioner: runs after Healthcare has added its permission."""
+	if doc.user_id:
+		_remove_practitioner_limit(doc.name, doc.user_id)
+
+
+def open_all_practitioner_records():
+	"""At each migration, for the practitioners already linked to a user."""
+	for row in frappe.get_all(
+		"Healthcare Practitioner", filters={"user_id": ["is", "set"]}, fields=["name", "user_id"]
+	):
+		_remove_practitioner_limit(row.name, row.user_id)
 
 
 @frappe.whitelist()
@@ -838,7 +873,6 @@ def _save_vitals(doc, vitals, finish):
 		vs = frappe.get_doc(
 			{
 				"doctype": "Vital Signs",
-				"owner": _owner(),
 				"patient": doc.patient,
 				"encounter": doc.name,
 				"signs_date": doc.encounter_date,
@@ -926,7 +960,6 @@ def save_consultation(
 		doc = frappe.get_doc(
 			{
 				"doctype": "Patient Encounter",
-				"owner": _owner(),
 				"encounter_time": nowtime_str(),
 				"custom_client_id": client_id,
 				**fields,
@@ -936,7 +969,6 @@ def save_consultation(
 		doc.set(table, value)
 	doc.flags.ignore_permissions = True
 	doc.save()
-	_keep_owner(doc)
 	_save_vitals(doc, vitals, cint(finish))
 	if cint(finish):
 		doc.submit()
@@ -999,7 +1031,6 @@ def _edit_vitals(doc, vitals):
 	vs.flags.ignore_permissions = True
 	vs.flags.ignore_validate_update_after_submit = True
 	vs.save()
-	_keep_owner(vs)
 
 
 def nowtime_str():

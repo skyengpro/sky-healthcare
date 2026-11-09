@@ -45,7 +45,7 @@
               <template v-if="!folded">
                 <div class="min-w-0 flex-1">
                   <div class="truncate text-[13.5px] font-semibold text-ink">{{ session.user.full_name }}</div>
-                  <div class="truncate text-[12px] text-ink-mute">{{ session.isAdmin ? t('Pharmacy administrator') : t('Pharmacy staff') }}</div>
+                  <div class="truncate text-[12px] text-ink-mute">{{ session.isAdmin ? t('Clinic Administrator') : t('Clinic Staff') }}</div>
                 </div>
                 <span class="lucide-chevrons-up-down size-4 text-ink-faint" />
               </template>
@@ -205,7 +205,7 @@ function toggleFold() {
 
 const pending = computed(() => alerts.data?.pending.length || 0)
 const sections = computed(() => [
-  { label: 'Pharmacy', first: true, items: [
+  { label: 'Stock', first: true, items: [
     { to: '/', label: 'Dashboard', icon: 'lucide-layout-grid', exact: true },
     { to: '/medicines', label: 'Medicines', icon: 'lucide-pill' },
     { to: '/give-out', label: 'Give out stock', icon: 'lucide-hand-heart' },

@@ -5,7 +5,8 @@
 Without a config file it only does the parts that need no choices (roles, fields, categories, units,
 dosages, notifications, store). See `site-setup.example.json` next to this file for every option.
 
-Every step is safe to run again: what already exists is kept, never changed or duplicated. New users
+Every step is safe to run again and creates no duplicates. Users, medicines and treatment types that
+already exist are kept; docs/default_install_configuration.md lists what is overwritten. New users
 without a password in the config get a generated one, printed once at the end.
 """
 
@@ -50,7 +51,7 @@ def setup(config: str | None = None):
 
 	_setup_wizard(cfg.get("company"), cfg.get("admin_user"), report)
 	install.after_install()
-	report["steps"].append("roles, custom fields, categories, units, notifications, Pharmacy store")
+	report["steps"].append("roles, custom fields, categories, units, notifications, Medical Store")
 	_system_settings(cfg.get("company") or {}, report)
 	_dosages(report)
 	_check_inventory_account(report)
@@ -169,11 +170,11 @@ def _check_inventory_account(report):
 
 
 def _user(u):
-	"""A pharmacy user (and their doctor profile), created like the Staff page does."""
+	"""An app user (and their doctor profile), created like the Staff page does."""
 	from sky_healthcare.api import save_staff
 
 	email = u["email"].strip().lower()
-	role = {"admin": "Pharmacy Admin", "staff": "Pharmacy Staff"}.get(u.get("role", "staff"), u.get("role"))
+	role = {"admin": "Clinic Admin", "staff": "Clinic Staff"}.get(u.get("role", "staff"), u.get("role"))
 	new = not frappe.db.exists("User", email)
 	password = u.get("password") or (_password() if new else None)
 	save_staff(email=email, full_name=u["full_name"], role=role, password=password)

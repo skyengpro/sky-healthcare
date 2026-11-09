@@ -6,7 +6,7 @@ export const ui = reactive({
   version: 0,
   addStock: { open: false, medicine: null },
   medicine: { open: false, code: null },
-  request: { open: false, medicine: null, qty: null },
+  request: { open: false, medicine: null, qty: null, doc: null },
   sync: { open: false },
   patient: { open: false, name: null },
   template: { open: false, name: null },
@@ -17,7 +17,8 @@ export const ui = reactive({
 export const changed = () => ui.version++
 export const openAddStock = (medicine = null) => Object.assign(ui.addStock, { open: true, medicine })
 export const openMedicine = (code = null) => Object.assign(ui.medicine, { open: true, code })
-export const openRequest = (medicine = null, qty = null) => Object.assign(ui.request, { open: true, medicine, qty })
+export const openRequest = (medicine = null, qty = null) => Object.assign(ui.request, { open: true, medicine, qty, doc: null })
+export const viewRequest = (doc) => Object.assign(ui.request, { open: true, medicine: null, qty: null, doc })
 export const openPatient = (name = null) => Object.assign(ui.patient, { open: true, name })
 export const openTemplate = (name = null) => Object.assign(ui.template, { open: true, name })
 export const openProcedure = (patient = null, template = null, serviceRequest = null) => Object.assign(ui.procedure, { open: true, patient, template, serviceRequest })

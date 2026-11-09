@@ -1,6 +1,6 @@
 <template>
   <Sheet v-model:open="ui.procedure.open" :title="t('Record a treatment')"
-    :message="t('The medicines used are taken from the pharmacy stock and written in the patient’s file.')"
+    :message="t('The medicines used are taken from the stock and written in the patient’s file.')"
     icon="lucide-stethoscope" theme="green" size="2xl">
     <div v-if="templates && !templates.length" class="rounded-[16px] border border-dashed border-line p-5 text-center">
       <p class="font-display text-[19px] text-ink">{{ hiddenCount ? t('No active treatment type') : t('No treatment types yet') }}</p>

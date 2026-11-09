@@ -49,6 +49,16 @@ function templateRow(i, name, old = {}) {
   }
 }
 
+function requestRow(i, old = {}) {
+  const d = i.data
+  // a change saved by an older version of the app holds one medicine and no rows
+  const lines = (d.items || [d]).map((r) => ({ medicine: r.medicine, medicine_name: r.medicine_name || r.medicine, qty: r.qty, unit: r.unit || '' }))
+  return {
+    name: i.localId || i.id, date: new Date(i.at).toISOString().slice(0, 10), requested_by: '', can_edit: true, ...old,
+    ...lines[0], items: lines, urgency: d.urgency, reason: d.reason, state: 'pending', status: 'Pending', pending: true,
+  }
+}
+
 function patientRow(i, name) {
   const d = i.data
   const patient_name = [d.first_name, d.last_name].filter(Boolean).join(' ')
@@ -149,11 +159,12 @@ export function overlay(method, params, data, outbox) {
     }
     case 'requests': {
       if (!Array.isArray(data)) return data
-      const fresh = items.filter((i) => short(i.method) === 'request_stock').map((i) => ({
-        name: i.id, date: new Date(i.at).toISOString().slice(0, 10), medicine: i.data.medicine, medicine_name: i.data.medicine_name || i.data.medicine, qty: i.data.qty,
-        unit: '', urgency: i.data.urgency, reason: i.data.reason, state: 'pending', status: 'Pending', requested_by: '', pending: true,
-      })).reverse()
-      return [...fresh, ...data]
+      const saves = items.filter((i) => short(i.method) === 'request_stock')
+      const rows = data.map((r) => {
+        const e = saves.filter((x) => x.data.name === r.name).pop()
+        return e ? requestRow(e, r) : r
+      })
+      return [...saves.filter((i) => !i.data.name).map((i) => requestRow(i)).reverse(), ...rows]
     }
     default:
       return data

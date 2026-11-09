@@ -1,7 +1,15 @@
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
-ROLES = ["Pharmacy Staff", "Pharmacy Admin"]
+ROLES = ["Clinic Staff", "Clinic Admin"]
+DEFAULT_ADMIN = {"email": "clinic.admin@gmail.com", "password": "clinicadmin123"}
+# Site-wide. Re-applied at each migration; docs/default_install_configuration.md explains each one.
+STOCK_SETTINGS = {
+	"enable_serial_and_batch_no_for_item": 1,
+	"use_serial_batch_fields": 1,
+	"pick_serial_and_batch_based_on": "Expiry",
+	"auto_indent": 1,
+}
 CATEGORIES = [
 	"Analgesic",
 	"Antibiotic",
@@ -224,31 +232,37 @@ HEALTH_FIELDS = {
 
 
 def after_install():
-	"""First install: everything in `after_migrate`, plus the site-wide stock settings and the store."""
+	"""First install: everything in `after_migrate`, plus the default administrator and the store."""
+	create_roles()
+	create_default_admin()
 	after_migrate()
 	if not erpnext_ready():
 		return  # finished by after_setup_wizard once the company exists
-	configure_stock()
 	create_warehouse()
 	# the setup wizard hook can run outside a request that commits; the store must exist when it ends
 	frappe.db.commit()  # nosemgrep
 
 
 def after_migrate():
-	"""Runs on every update. Only adds what is missing; never changes settings an administrator may have edited."""
+	"""Runs on every update. Re-applies the site configuration, overwriting local changes to it.
+
+	The catalogue is only completed: categories and units an administrator added or edited are kept.
+	"""
 	create_roles()
 	create_custom_fields(CUSTOM_FIELDS, update=True)
 	if erpnext_ready():
 		create_catalogue()
+		configure_stock()
 	create_alerts()
 	setup_health()
 
 
 def setup_health():
-	"""Link the pharmacy to Frappe Health: custom fields, and a Medication for every medicine."""
+	"""Link the app to Frappe Health: custom fields, and a Medication for every medicine."""
 	from sky_healthcare.health import (
-		ensure_appointment_type,
+		configure_appointment_type,
 		has_health,
+		open_all_practitioner_records,
 		sync_all_medications,
 		sync_all_practitioners,
 	)
@@ -265,8 +279,9 @@ def setup_health():
 			is_group=0,
 		)
 		sync_all_medications()
-		ensure_appointment_type()
+		configure_appointment_type()
 		sync_all_practitioners()
+	open_all_practitioner_records()
 
 
 def erpnext_ready():
@@ -294,8 +309,30 @@ def create_roles():
 				ignore_permissions=True
 			)
 		else:
-			# pharmacy users only use the app, never the ERPNext desk
+			# these users work in the app only, never in the ERPNext desk
 			frappe.db.set_value("Role", role, "desk_access", 0)
+
+
+def create_default_admin():
+	"""The first clinic administrator. An existing user with this email is left as it is."""
+	if frappe.db.exists("User", DEFAULT_ADMIN["email"]):
+		return
+	user = frappe.get_doc(
+		{
+			"doctype": "User",
+			"email": DEFAULT_ADMIN["email"],
+			"first_name": "Clinic",
+			"last_name": "Admin",
+			"send_welcome_email": 0,
+			"user_type": "Website User",
+			"roles": [{"role": "Clinic Admin"}],
+		}
+	)
+	user.new_password = DEFAULT_ADMIN["password"]
+	# a site's password policy must not stop the install
+	user.flags.ignore_password_policy = True
+	user.flags.ignore_permissions = True
+	user.insert()
 
 
 def _insert_if_missing(doctype, name, **fields):
@@ -314,17 +351,11 @@ def create_catalogue():
 
 
 def configure_stock():
-	"""Batches with expiry dates and automatic reorder requests.
-
-	These are site-wide Stock Settings, so they are only set on first install. Batch numbers are
-	required for expiry tracking; the rest can be changed back in ERPNext without breaking the app.
-	"""
-	ss = frappe.get_single("Stock Settings")
-	ss.enable_serial_and_batch_no_for_item = 1
-	ss.use_serial_batch_fields = 1
-	ss.pick_serial_and_batch_based_on = "Expiry"
-	ss.auto_indent = 1
-	ss.save(ignore_permissions=True)
+	"""Batches with expiry dates, earliest expiry first, and automatic reorder requests."""
+	settings = frappe.get_single("Stock Settings")
+	if any(settings.get(field) != value for field, value in STOCK_SETTINGS.items()):
+		settings.update(STOCK_SETTINGS)
+		settings.save(ignore_permissions=True)
 
 
 def default_company():
@@ -332,7 +363,7 @@ def default_company():
 
 
 def create_warehouse(company=None):
-	"""Create the "Pharmacy" store for a company (default company if none given).
+	"""Create the "Medical Store" warehouse for a company (default company if none given).
 
 	Run by hand for another company: bench --site <site> execute sky_healthcare.setup.install.create_warehouse --kwargs "{'company': 'X'}"
 	"""
@@ -348,16 +379,19 @@ def create_warehouse(company=None):
 			"Set one in the Company, or disable perpetual inventory, before recording stock."
 		)
 	abbr = frappe.db.get_value("Company", company, "abbr")
-	name = f"Pharmacy - {abbr}"
+	name = f"Medical Store - {abbr}"
 	if not frappe.db.exists("Warehouse", name):
-		frappe.get_doc(
+		warehouse = frappe.get_doc(
 			{
 				"doctype": "Warehouse",
-				"warehouse_name": "Pharmacy",
+				"warehouse_name": "Medical Store",
 				"company": company,
 				"parent_warehouse": f"All Warehouses - {abbr}",
 			}
-		).insert(ignore_permissions=True)
+		)
+		# a missing inventory account is reported above; it must not abort the install
+		warehouse.flags.ignore_inventory_account_validation = True
+		warehouse.insert(ignore_permissions=True)
 
 
 def _alert(subject, **fields):
@@ -380,7 +414,7 @@ def create_alerts():
 		condition="doc.batch_qty > 0",
 		enabled=1,
 		message="Batch {{ doc.name }} of {{ doc.item }} expires on {{ doc.expiry_date }}. Qty left: {{ doc.batch_qty }}.",
-		recipients=[{"receiver_by_role": "Pharmacy Admin"}, {"receiver_by_role": "Pharmacy Staff"}],
+		recipients=[{"receiver_by_role": "Clinic Admin"}, {"receiver_by_role": "Clinic Staff"}],
 	)
 	_alert(
 		"Low stock: reorder requested ({{ doc.name }})",
@@ -390,7 +424,7 @@ def create_alerts():
 		condition="doc.auto_created_via_reorder",
 		enabled=1,
 		message="Stock fell below the minimum level. Request {{ doc.name }} was created.",
-		recipients=[{"receiver_by_role": "Pharmacy Admin"}],
+		recipients=[{"receiver_by_role": "Clinic Admin"}],
 	)
 	# renamed from "Stock request ...": drop the old notification so a site does not get both
 	frappe.db.delete(
@@ -405,5 +439,5 @@ def create_alerts():
 		condition="not doc.auto_created_via_reorder",
 		enabled=1,
 		message="{{ doc.owner }} asked for stock. Urgency: {{ doc.custom_urgency }}. {{ doc.custom_reason or '' }}",
-		recipients=[{"receiver_by_role": "Pharmacy Admin"}],
+		recipients=[{"receiver_by_role": "Clinic Admin"}],
 	)

@@ -85,7 +85,10 @@ async function choose(page, label, option, scope = 'body') {
 }
 async function pickMedicine(page, name, scope = 'body') {
   const h = await field(page, 'Medicine', scope)
-  await h.click()
+  await chooseMedicine(page, h, name)
+}
+async function chooseMedicine(page, control, name) {
+  await control.click()
   await sleep(200)
   await page.keyboard.type(name.slice(0, 12))
   const opt = await page.waitForSelector(`::-p-xpath(//*[@role="option"][.//text()[normalize-space(.)=${JSON.stringify(name)}]])`, { visible: true, timeout: 8000 })
@@ -207,8 +210,11 @@ await check('giving out more than available is refused', true)
 // request stock
 await click(staff, 'Medical requests', 'a')
 await click(staff, 'New request')
-await pickMedicine(staff, MED, 'dialog')
-await fill(staff, 'Quantity needed', '100', 'dialog')
+await chooseMedicine(staff, await staff.waitForSelector('[role="dialog"] tbody td:nth-of-type(3) input:not([disabled])'), MED)
+await staff.$eval('[role="dialog"] tbody input[type=number]', (el) => {
+  el.value = '100'
+  el.dispatchEvent(new Event('input', { bubbles: true }))
+})
 await click(staff, 'Urgent', '*[@role="dialog"]//button')
 await fill(staff, 'Reason', 'Running low before the vaccination campaign', 'dialog')
 await click(staff, 'Send request')

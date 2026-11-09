@@ -1,6 +1,6 @@
 """Server API for the Healthcare Management app.
 
-Every function checks the caller's pharmacy role first, then does the stock work with ERPNext on
+Every function checks the caller's app role first, then does the stock work with ERPNext on
 the user's behalf. Staff never need ERPNext permissions of their own, and each write is one
 call, so a dropped connection cannot leave half a record behind.
 
@@ -16,9 +16,9 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, flt, getdate, nowdate
 
-STAFF_ROLES = ("Pharmacy Staff", "Pharmacy Admin", "System Manager")
-ADMIN_ROLES = ("Pharmacy Admin", "System Manager")
-PHARMACY_ROLES = ("Pharmacy Staff", "Pharmacy Admin")
+STAFF_ROLES = ("Clinic Staff", "Clinic Admin", "System Manager")
+ADMIN_ROLES = ("Clinic Admin", "System Manager")
+APP_ROLES = ("Clinic Staff", "Clinic Admin")
 EXPIRY_WARNING_DAYS = 90
 # Why stock may leave without a patient. Medicine for a patient leaves through a procedure ("Used in a procedure").
 # Older entries keep their earlier reasons ("Dispensed to a patient", "Transfer to ...") in the history.
@@ -41,13 +41,13 @@ def _roles():
 
 def _require_staff():
 	if frappe.session.user == "Guest" or not (_roles() & set(STAFF_ROLES)):
-		frappe.throw(_("You do not have access to the pharmacy."), frappe.PermissionError)
+		frappe.throw(_("You do not have access to this app."), frappe.PermissionError)
 
 
 def _require_admin():
 	_require_staff()
 	if not (_roles() & set(ADMIN_ROLES)):
-		frappe.throw(_("Only a pharmacy administrator can do this."), frappe.PermissionError)
+		frappe.throw(_("Only a clinic administrator can do this."), frappe.PermissionError)
 
 
 def _is_admin():
@@ -64,12 +64,10 @@ def _company():
 
 def _warehouse():
 	wh = frappe.db.get_value(
-		"Warehouse", {"warehouse_name": "Pharmacy", "is_group": 0, "company": _company()}, "name"
+		"Warehouse", {"warehouse_name": "Medical Store", "is_group": 0, "company": _company()}, "name"
 	)
 	if not wh:
-		frappe.throw(
-			_("The Pharmacy store is not set up. Ask your administrator to finish the installation.")
-		)
+		frappe.throw(_("The Medical Store is not set up. Ask your administrator to finish the installation."))
 	return wh
 
 
@@ -91,12 +89,13 @@ def _as_system():
 	"""Run stock postings with full rights after the role check.
 
 	ERPNext checks permissions deep inside stock posting (batch bundles, ledger entries), and
-	pharmacy users deliberately have no ERPNext permissions. Documents still record the real
-	user as their owner, see `_owner`.
+	app users deliberately have no ERPNext permissions. Documents still record the real
+	user, see `record_real_user`, and their change history names them through `audit_user`.
 	"""
 	user = frappe.session.user
-	# the caller already passed the pharmacy role check in `_writes`; the real user is restored below
+	# the caller already passed the app role check in `_writes`; the real user is restored below
 	frappe.set_user("Administrator")  # nosemgrep
+	frappe.session.data.audit_user = user  # shown as "Action taken by" in the change history
 	try:
 		yield user
 	finally:
@@ -104,7 +103,7 @@ def _as_system():
 
 
 def _writes(admin=False):
-	"""Check the caller's pharmacy role, then run the write with full rights (see `_as_system`)."""
+	"""Check the caller's app role, then run the write with full rights (see `_as_system`)."""
 
 	def decorator(fn):
 		@wraps(fn)
@@ -133,13 +132,21 @@ def _owner():
 	return frappe.flags.sky_healthcare_user or frappe.session.user
 
 
-def _keep_owner(doc):
-	"""Frappe records the session user (here the elevated system user) as owner; put the real user back."""
-	user = _owner()
-	if user and doc.owner != user:
-		frappe.db.set_value(doc.doctype, doc.name, "owner", user, update_modified=False)
-		doc.owner = user
-	return doc
+def record_real_user(doc, method=None):
+	"""Put the real user on every document written during an elevated call (`on_change` of all doctypes).
+
+	Frappe stamps the session user, which is Administrator inside `_as_system`. Outside an elevated
+	call this does nothing.
+	"""
+	user = frappe.flags.sky_healthcare_user
+	if not user or doc.meta.issingle or doc.meta.is_virtual:
+		return
+	values = {"modified_by": user}
+	if doc.flags.in_insert:
+		values["owner"] = user
+		doc.owner = user  # kept in memory too, or a later submit of this document would write it back
+	frappe.db.set_value(doc.doctype, doc.name, values, update_modified=False)
+	doc.modified_by = user
 
 
 def _existing(doctype, client_id):
@@ -152,7 +159,7 @@ def _existing(doctype, client_id):
 
 
 # Guests must be able to call this: the login screen asks it who is logged in and for a CSRF token.
-# It returns nothing but {"user": None} unless the caller is a pharmacy user.
+# It returns nothing but {"user": None} unless the caller is an app user.
 @frappe.whitelist(allow_guest=True)  # nosemgrep
 def boot():
 	"""Everything the app needs at start. Also returns a fresh CSRF token, so a cached page can still post."""
@@ -436,7 +443,6 @@ def save_medicine(
 	item = frappe.get_doc(
 		{
 			"doctype": "Item",
-			"owner": _owner(),
 			"custom_client_id": client_id,
 			"item_code": name,
 			"item_name": name,
@@ -458,7 +464,6 @@ def save_medicine(
 		}
 	)
 	item.insert(ignore_permissions=True)
-	_keep_owner(item)
 	health.sync_medication(item.name)  # the same medicine in Frappe Health
 	out = {"code": item.name}
 	if flt(qty) > 0:
@@ -469,7 +474,7 @@ def save_medicine(
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
 def delete_medicine(code: str):
-	"""Remove a medicine from the list (pharmacy staff and administrators).
+	"""Remove a medicine from the list (clinic staff and administrators).
 
 	A medicine that still has stock cannot be removed. One that was never used is deleted. One with
 	history is archived instead (disabled), because ERPNext must keep its stock ledger; it disappears
@@ -508,7 +513,7 @@ def _submit(doc):
 	doc.flags.ignore_permissions = True
 	doc.insert()
 	doc.submit()
-	return _keep_owner(doc)
+	return doc
 
 
 @frappe.whitelist(methods=["POST"])
@@ -522,7 +527,7 @@ def add_stock(
 	lot: str | int | None = None,
 	client_id: str | None = None,
 ):
-	"""Record a delivery: one batch with its expiry date, added to the pharmacy store."""
+	"""Record a delivery: one batch with its expiry date, added to the Medical Store."""
 	_require_staff()
 	if done := _existing("Stock Entry", client_id):
 		return {"stock_entry": done, "duplicate": True}
@@ -554,14 +559,12 @@ def add_stock(
 		b = frappe.get_doc(
 			{
 				"doctype": "Batch",
-				"owner": _owner(),
 				"item": medicine,
 				"expiry_date": expiry,
 				**({"batch_id": lot} if lot else {}),
 			}
 		)
 		b.insert(ignore_permissions=True)
-		_keep_owner(b)
 		batch = b.name
 
 	wh = _warehouse()
@@ -569,7 +572,6 @@ def add_stock(
 		frappe.get_doc(
 			{
 				"doctype": "Stock Entry",
-				"owner": _owner(),
 				"stock_entry_type": "Material Receipt",
 				"company": _company(),
 				"set_posting_time": 1,
@@ -650,7 +652,6 @@ def give_out(
 		frappe.get_doc(
 			{
 				"doctype": "Stock Entry",
-				"owner": _owner(),
 				"stock_entry_type": "Material Issue",
 				"company": _company(),
 				"set_posting_time": 1,
@@ -681,25 +682,32 @@ def give_out(
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
 def request_stock(
-	medicine: str,
-	qty: int | float | str,
+	medicine: str | None = None,
+	qty: int | float | str | None = None,
 	urgency: str = "Routine",
 	reason: str | None = None,
 	client_id: str | None = None,
+	items: list | str | None = None,
+	name: str | None = None,
 ):
-	"""Ask for medicine to be ordered. The request waits for a pharmacy administrator."""
+	"""Ask for medicines to be ordered, or change a request still waiting for a clinic administrator.
+
+	`items` holds the rows ({medicine, qty}). `medicine` and `qty` are the single-row form that
+	devices with an older version of the app can still have waiting to be sent.
+	"""
 	_require_staff()
-	if done := _existing("Material Request", client_id):
+	if not name and (done := _existing("Material Request", client_id)):
 		return {"request": done, "duplicate": True}
-	if flt(qty) <= 0:
-		frappe.throw(_("Quantity must be more than 0"))
+	lines = _request_lines(medicine, qty, items)
 	if urgency not in URGENCY_DAYS:
 		urgency = "Routine"
+	if name:
+		return {"request": _update_request(name, lines, urgency, reason)}
 	need = add_days(nowdate(), URGENCY_DAYS[urgency])
+	warehouse = _warehouse()
 	mr = frappe.get_doc(
 		{
 			"doctype": "Material Request",
-			"owner": _owner(),
 			"material_request_type": "Purchase",
 			"company": _company(),
 			"schedule_date": need,
@@ -707,14 +715,65 @@ def request_stock(
 			"custom_reason": reason or "",
 			"custom_client_id": client_id,
 			"items": [
-				{"item_code": medicine, "qty": flt(qty), "schedule_date": need, "warehouse": _warehouse()}
+				{
+					"item_code": line["medicine"],
+					"qty": flt(line["qty"]),
+					"schedule_date": need,
+					"warehouse": warehouse,
+				}
+				for line in lines
 			],
 		}
 	)
 	mr.flags.ignore_permissions = True
 	mr.insert()
-	_keep_owner(mr)
 	return {"request": mr.name}
+
+
+def _request_lines(medicine, qty, items):
+	lines = frappe.parse_json(items) if items else [{"medicine": medicine, "qty": qty}]
+	seen = set()
+	for line in lines:
+		code = line.get("medicine")
+		if not code:
+			frappe.throw(_("Please choose a medicine on every row."))
+		if flt(line.get("qty")) <= 0:
+			frappe.throw(_("Quantity must be more than 0"))
+		if code in seen:
+			frappe.throw(_("{0} is listed twice. Keep one row and add up the quantity.").format(code))
+		seen.add(code)
+	return lines
+
+
+def _can_edit_request(owner):
+	return owner == _owner() or _is_admin()
+
+
+def _update_request(name, lines, urgency, reason):
+	mr = frappe.get_doc("Material Request", name)
+	if not _can_edit_request(mr.owner):
+		frappe.throw(
+			_("Only the person who created this request or an administrator can change it."),
+			frappe.PermissionError,
+		)
+	if _request_status(mr) != "pending":
+		frappe.throw(_("This request has already been handled."))
+	if urgency != mr.custom_urgency:
+		mr.schedule_date = add_days(nowdate(), URGENCY_DAYS[urgency])
+	mr.custom_urgency = urgency
+	mr.custom_reason = reason or ""
+	# a medicine that stays keeps its row, so a unit chosen in ERPNext is not lost
+	kept = {row.item_code: row for row in mr.items}
+	warehouse = _warehouse()
+	mr.set("items", [])
+	for idx, line in enumerate(lines, 1):
+		row = mr.append(
+			"items", kept.get(line["medicine"]) or {"item_code": line["medicine"], "warehouse": warehouse}
+		)
+		row.update({"idx": idx, "qty": flt(line["qty"]), "schedule_date": mr.schedule_date})
+	mr.flags.ignore_permissions = True
+	mr.save()
+	return mr.name
 
 
 def _request_status(r):
@@ -732,6 +791,26 @@ def _request_status(r):
 	}.get(r.status, "approved")
 
 
+def _request_items(names):
+	if not names:
+		return {}
+	rows = frappe.db.sql(
+		"""
+		select mri.parent, mri.item_code as medicine, i.item_name as medicine_name, mri.qty, mri.uom as unit
+		from `tabMaterial Request Item` mri
+		left join `tabItem` i on i.name = mri.item_code
+		where mri.parent in %(names)s
+		order by mri.parent, mri.idx
+		""",
+		{"names": names},
+		as_dict=True,
+	)
+	out = {}
+	for row in rows:
+		out.setdefault(row.pop("parent"), []).append(row)
+	return out
+
+
 @frappe.whitelist()
 def requests(status: str | None = None, limit: int | str = 100):
 	_require_staff()
@@ -739,20 +818,23 @@ def requests(status: str | None = None, limit: int | str = 100):
 		"""
 		select mr.name, mr.transaction_date as date, mr.schedule_date as needed_by, mr.docstatus, mr.status,
 			mr.custom_urgency as urgency, mr.custom_reason as reason, mr.custom_rejected, mr.custom_decision_note as note,
-			mr.auto_created_via_reorder as automatic, mr.owner, mri.item_code as medicine, i.item_name as medicine_name,
-			mri.qty, mri.stock_uom as unit
+			mr.auto_created_via_reorder as automatic, mr.owner
 		from `tabMaterial Request` mr
-		join `tabMaterial Request Item` mri on mri.parent = mr.name and mri.idx = 1
-		left join `tabItem` i on i.name = mri.item_code
 		where mr.material_request_type = 'Purchase'
 		order by mr.creation desc limit %(limit)s
 		""",
 		{"limit": cint(limit)},
 		as_dict=True,
 	)
+	lines = _request_items([r.name for r in rows])
+	rows = [r for r in rows if lines.get(r.name)]
 	names = _user_names(r.owner for r in rows)
 	for r in rows:
+		r["items"] = lines[r.name]
+		# the first row stands for the request where there is only room for one line
+		r.update(lines[r.name][0])
 		r.state = _request_status(r)
+		r.can_edit = _can_edit_request(r.owner)
 		r.requested_by = _("Automatic (low stock)") if r.automatic else names.get(r.owner, r.owner)
 	if status and status != "all":
 		rows = [r for r in rows if r.state == status]
@@ -1025,14 +1107,14 @@ def staff():
 		"""select distinct u.name, u.full_name, u.email, u.enabled, u.last_login, hr.role
 		from `tabUser` u join `tabHas Role` hr on hr.parent = u.name and hr.parenttype = 'User'
 		where hr.role in %(roles)s order by u.full_name""",
-		{"roles": PHARMACY_ROLES},
+		{"roles": APP_ROLES},
 		as_dict=True,
 	)
 	out = {}
 	for u in users:
-		row = out.setdefault(u.name, {**u, "role": "Pharmacy Staff"})
-		if u.role == "Pharmacy Admin":
-			row["role"] = "Pharmacy Admin"
+		row = out.setdefault(u.name, {**u, "role": "Clinic Staff"})
+		if u.role == "Clinic Admin":
+			row["role"] = "Clinic Admin"
 	return list(out.values())
 
 
@@ -1041,25 +1123,25 @@ def staff():
 def save_staff(
 	email: str,
 	full_name: str,
-	role: str = "Pharmacy Staff",
+	role: str = "Clinic Staff",
 	password: str | None = None,
 	enabled: int | bool | str = 1,
 ):
-	"""Create or update a pharmacy user. Administrators can only give the two pharmacy roles."""
+	"""Create or update an app user. Administrators can only give the two app roles."""
 	_require_admin()
-	if role not in PHARMACY_ROLES:
+	if role not in APP_ROLES:
 		frappe.throw(_("Invalid role"))
 	email = (email or "").strip().lower()
 	if frappe.db.exists("User", email):
 		user = frappe.get_doc("User", email)
-		other_roles = [r.role for r in user.roles if r.role not in PHARMACY_ROLES]
+		other_roles = [r.role for r in user.roles if r.role not in APP_ROLES]
 		if other_roles and "System Manager" not in _roles():
 			frappe.throw(
 				_("This user has other access in the system and can only be changed by the system manager.")
 			)
 		if (
 			email == _owner()
-			and (role != "Pharmacy Admin" or not cint(enabled))
+			and (role != "Clinic Admin" or not cint(enabled))
 			and "System Manager" not in _roles()
 		):
 			frappe.throw(_("You cannot remove your own administrator access."))
@@ -1071,7 +1153,7 @@ def save_staff(
 	user.first_name = parts[0] or email
 	user.last_name = parts[1] if len(parts) > 1 else ""
 	user.enabled = cint(enabled)
-	keep = [r.role for r in user.get("roles", []) if r.role not in PHARMACY_ROLES]
+	keep = [r.role for r in user.get("roles", []) if r.role not in APP_ROLES]
 	user.set("roles", [])
 	for r in [*keep, role]:
 		user.append("roles", {"role": r})
@@ -1080,7 +1162,7 @@ def save_staff(
 	user.flags.ignore_permissions = True
 	user.flags.ignore_password_policy = False
 	user.save()
-	health.sync_practitioner(user.name)  # every pharmacy user is also a doctor profile in Frappe Health
+	health.sync_practitioner(user.name)  # every app user is also a doctor profile in Frappe Health
 	return {"name": user.name}
 
 

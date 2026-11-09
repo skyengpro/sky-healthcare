@@ -245,7 +245,7 @@ if A_USER:
 		{
 			"email": email,
 			"full_name": f"Doctor {tag}",
-			"role": "Pharmacy Staff",
+			"role": "Clinic Staff",
 			"password": "Tmp-Passw0rd!x9",
 		},
 	)
@@ -254,7 +254,7 @@ if A_USER:
 		any(d["user_id"] == email for d in staff.get("health.practitioners")),
 	)
 	admin.post(
-		"save_staff", {"email": email, "full_name": f"Doctor {tag}", "role": "Pharmacy Staff", "enabled": 0}
+		"save_staff", {"email": email, "full_name": f"Doctor {tag}", "role": "Clinic Staff", "enabled": 0}
 	)
 	check(
 		"disabling the user disables the doctor",

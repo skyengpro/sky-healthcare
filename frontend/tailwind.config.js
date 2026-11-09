@@ -1,7 +1,7 @@
 import preset, { content } from 'frappe-ui/tailwind'
 
 // Healthcare Management tokens. Every colour is a CSS variable (see src/style.css) so light and dark themes
-// share one set of class names. Warm paper, ink, one apothecary green; amber and red only for warnings.
+// share one set of class names. Warm paper, ink, one green; amber and red only for warnings.
 const v = (name) => `rgb(var(--ps-${name}) / <alpha-value>)`
 
 export default {

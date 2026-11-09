@@ -112,7 +112,7 @@
                 <FormControl v-model="r.period" type="select" variant="outline" size="md" :options="session.options.durations.map((v) => ({ label: durationLabel(v), value: v }))" />
                 <FormControl v-model="r.comment" variant="outline" size="md" :placeholder="t('e.g. after meals')" />
               </div>
-              <p v-if="r.stock !== undefined && r.stock !== null && r.stock <= 0" class="mt-2 text-[12px] text-warn">{{ t('Out of stock in the pharmacy right now.') }}</p>
+              <p v-if="r.stock !== undefined && r.stock !== null && r.stock <= 0" class="mt-2 text-[12px] text-warn">{{ t('Out of stock right now.') }}</p>
             </li>
           </ul>
           <button type="button" class="mt-3 inline-flex items-center gap-1.5 rounded-full px-2 py-1.5 text-[13px] font-semibold text-apo transition hover:bg-apo-mist" @click="addRx">
