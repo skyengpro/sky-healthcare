@@ -143,7 +143,8 @@ def _keep_owner(doc):
 
 
 def _existing(doctype, client_id):
-	if client_id:
+	# a site that was not migrated yet has no client id column: skip the check instead of failing
+	if client_id and frappe.db.has_column(doctype, "custom_client_id"):
 		return frappe.db.get_value(doctype, {"custom_client_id": client_id}, "name")
 
 
