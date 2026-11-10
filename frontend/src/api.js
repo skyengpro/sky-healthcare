@@ -299,15 +299,24 @@ export async function post(method, data = {}, retried = false) {
           Accept: 'application/json',
           'Content-Type': 'application/json',
           'X-Frappe-CSRF-Token': net.csrf || '',
+          // who made the change: the server refuses it if the browser now holds someone else's session
+          ...(net.user ? { 'X-Sky-Healthcare-User': net.user } : {}),
         },
         body: JSON.stringify(data),
       },
       WRITE_TIMEOUT,
     )
   } catch (e) {
+    if (e instanceof ApiError && e.type === 'SessionChanged') net.authNeeded = true
     // a cached page can hold an old token: fetch a fresh one once and retry
     if (!retried && e instanceof ApiError && e.type === 'CSRFTokenError') {
       const boot = await get('boot')
+      // the browser may now hold someone else's session (signed in from another tab): never send under their name
+      const user = boot?.user && (boot.user.email || boot.user.name)
+      if (net.user && user !== net.user) {
+        net.authNeeded = true
+        throw new ApiError(t('Your session ended. Please sign in again.'), 403, 'SessionChanged')
+      }
       net.csrf = boot?.csrf_token
       return post(method, data, true)
     }
@@ -417,6 +426,7 @@ async function enqueue(item) {
 
 /** Is the person still signed in? (a refused change may only mean the session ended while offline) */
 async function sessionEnded(e) {
+  if (e instanceof ApiError && e.type === 'SessionChanged') return true
   if (!(e instanceof ApiError) || !([401, 403].includes(e.status) || e.type === 'CSRFTokenError')) return false
   try {
     const r = await fetch('/api/method/frappe.auth.get_logged_user', { credentials: 'same-origin', cache: 'no-store' })
@@ -513,7 +523,9 @@ async function run() {
           break
         }
         if (transient(e) && (item.attempts = (item.attempts || 0) + 1) < MAX_ATTEMPTS) {
-          // the server is busy or had an error: keep the order, try again in a moment
+          // the server is busy or had an error: keep the order, try again in a moment.
+          // The count is stored: the next pass reads the stored copy, and would otherwise start again from 0
+          await store(item)
           again = true
           break
         }

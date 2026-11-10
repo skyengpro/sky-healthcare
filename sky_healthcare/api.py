@@ -102,6 +102,24 @@ def _as_system():
 		frappe.set_user(user)  # nosemgrep
 
 
+class SessionChanged(frappe.PermissionError):
+	"""The browser now holds another person's session than the one the change was made by."""
+
+
+def _check_expected_user():
+	"""Refuse a change made by one person and sent with another person's session.
+
+	The app sends who made the change. A tab kept open can hold the changes of someone whose session ended
+	while another person signed in on the same browser; Frappe skips the CSRF check on a session that has
+	no token yet, so the app's own check is not enough to stop the change being recorded under the wrong name.
+	"""
+	expected = frappe.get_request_header("X-Sky-Healthcare-User") if frappe.request else None
+	if not expected or expected == frappe.session.user:
+		return
+	if expected != frappe.db.get_value("User", frappe.session.user, "email"):
+		frappe.throw(_("Your session ended. Please sign in again."), SessionChanged)
+
+
 def _writes(admin=False):
 	"""Check the caller's app role, then run the write with full rights (see `_as_system`)."""
 
@@ -111,6 +129,7 @@ def _writes(admin=False):
 			_require_admin() if admin else _require_staff()
 			if frappe.flags.sky_healthcare_elevated:
 				return fn(*args, **kwargs)
+			_check_expected_user()
 			roles = set(frappe.get_roles())
 			with _as_system() as user:
 				frappe.flags.update(

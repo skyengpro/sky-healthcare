@@ -1,10 +1,11 @@
 // Offline edge cases found in review: two tabs, discard while sending, dependent changes, a failing device,
 // gateway errors, who is signed in, logging out offline, and stock shown for a finished treatment.
-//   node tests/offline_review_e2e.mjs <site-url> <staff-email> <staff-pw>
+//   node tests/offline_review_e2e.mjs <site-url> <staff-email> <staff-pw> [<other-staff-email> <other-staff-pw>]
 // The staff user's language must be English. Needs puppeteer-core and Chrome (CHROME=/path to override).
+// The second staff user is only needed for the "session switch" case (skipped without it).
 import { start, sleep, text, clickText, fillLabel, serverClient } from './offline_helpers.mjs'
 
-const [SITE, S_USER, S_PW] = process.argv.slice(2)
+const [SITE, S_USER, S_PW, OTHER_USER, OTHER_PW] = process.argv.slice(2)
 let fails = 0
 const check = (label, ok, extra = '') => {
   console.log(ok ? 'PASS' : 'FAIL', label, extra)
@@ -180,6 +181,8 @@ await openApp(P)
   check('gateway: a proxy answering 504 is tried a few times, with growing pauses', hits >= 2 && hits <= 4, `${hits} tries in 14 s`)
   check('gateway: the app does not claim to be offline', !t.includes("You're offline"))
   check('gateway: the change is kept', (await outbox(P)).length === 1)
+  // the count must survive between passes, or the limit is never reached and the change is retried forever
+  check('gateway: the tries are counted on the device', (await outbox(P))[0]?.attempts >= 2, `attempts=${(await outbox(P))[0]?.attempts}`)
   block = false
   const ok = await waitFor(async () => (await outbox(P)).length === 0, 60)
   P.removeAllListeners('request'); await P.setRequestInterception(false)
@@ -231,6 +234,29 @@ await openApp(P)
   const after = (await server.read('medicines')).find((m) => m.code === med.code).stock
   check('treatment: once online it is sent and the real stock matches', ok && after === before - 3, `${before} -> ${after}`)
 }
+
+// ===================================================================== 8b. someone else signs in from another tab: this tab's changes are not sent under their account
+if (OTHER_USER) {
+  const N = 'Switch' + rand()
+  await P.setOfflineMode(true); await sleep(1500)
+  await newPatient(P, N)
+  // this person's session ends, and someone else signs in from another tab of the same browser
+  await P.deleteCookie({ name: 'sid', url: SITE })
+  const other = await b.newPage()
+  await other.goto(SITE + '/sky-healthcare/login', { waitUntil: 'domcontentloaded' })
+  await other.evaluate(async (u, w) => { await fetch('/api/method/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usr: u, pwd: w }) }) }, OTHER_USER, OTHER_PW)
+  await P.bringToFront()
+  await P.setOfflineMode(false)
+  await sleep(12000)
+  check('session switch: the change is not sent under the other account', (await patientsLike(N)).length === 0)
+  check('session switch: the tab asks to sign in again', (await flat(P)).includes('Your session ended'))
+  // the person signs in again: the change goes out under their own account
+  await other.close()
+  await P.evaluate(async (u, w) => { await fetch('/api/method/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usr: u, pwd: w }) }) }, S_USER, S_PW)
+  await reload(P)
+  await waitFor(async () => (await patientsLike(N)).length === 1, 20)
+  check('session switch: once signed in again, it is sent once', (await patientsLike(N)).length === 1)
+} else console.log('SKIP session switch (pass a second staff user: <other-email> <other-pw>)')
 
 // ===================================================================== 9. logging out with unsent changes asks first, from the Account page too
 {

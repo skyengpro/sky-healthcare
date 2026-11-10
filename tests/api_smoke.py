@@ -34,6 +34,7 @@ class Client:
 			headers["Content-Type"] = "application/x-www-form-urlencoded" if form else "application/json"
 			if getattr(self, "csrf", None):
 				headers["X-Frappe-CSRF-Token"] = self.csrf
+			headers.update(getattr(self, "extra", {}))
 		try:
 			return json.loads(
 				self.op.open(urllib.request.Request(url, body, headers, method=verb)).read()
@@ -226,4 +227,17 @@ ma = {
 }
 m1, m2 = staff.post("save_medicine", ma), staff.post("save_medicine", ma)
 check("a medicine sent twice is created once", m1["code"] == m2["code"])
+# a tab can hold changes made by someone whose session ended while another person signed in
+staff.extra = {"X-Sky-Healthcare-User": A_USER}
+fails(
+	"a change made by someone else is refused with this session",
+	lambda: staff.post("add_category", {"name": f"ZZ Other {uuid.uuid4().hex[:5]}"}),
+	"session ended",
+)
+staff.extra = {"X-Sky-Healthcare-User": S_USER}
+check(
+	"a change made by the signed-in person goes through",
+	staff.post("add_category", {"name": used})["name"] == used,
+)
+staff.extra = {}
 print(f"\n{ok} checks passed")

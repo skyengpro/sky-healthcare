@@ -49,6 +49,7 @@ export default {
   'Back online.': 'De nouveau en ligne.',
   'All changes are sent.': 'Tout a été envoyé.',
   'Your session ended.': 'Votre session a expiré.',
+  'Your session ended. Please sign in again.': 'Votre session a expiré. Veuillez vous reconnecter.',
   '{0} change(s) saved on this device, sent automatically later.': '{0} modification(s) enregistrée(s) sur cet appareil, envoyée(s) automatiquement plus tard.',
   'Everything you do is saved on this device and sent when you are back online.': 'Tout ce que vous faites est enregistré sur cet appareil et envoyé dès le retour de la connexion.',
   'Sending {0} change(s)…': 'Envoi de {0} modification(s)…',

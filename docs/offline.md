@@ -52,7 +52,9 @@ Rules worth knowing:
 - **People.** Changes are tagged with their user. Only the signed-in person's changes are shown, counted and sent, and nothing is
   sent before the person is known (the page is still starting). Another person's changes stay on the device for them.
 - **Session.** If the session ended while offline, sending pauses and the bar asks to sign in again. The start of the app never uses
-  the copy on the device to decide who is signed in.
+  the copy on the device to decide who is signed in. If someone else signed in from another tab meanwhile, an open tab never sends
+  its changes under their account: it pauses and asks to sign in again.
+- **Server errors.** The number of tries of a change is kept on the device, so the limit holds across passes and reloads.
 - **Logging out.** It clears the copy and this person's waiting changes (after a warning, from the top menu and from the Account
   page). If the server cannot be reached, the log out is remembered and finished at the next visit with a connection, before
   any screen is shown; until then the app shows the login page.
@@ -68,7 +70,7 @@ Rules worth knowing:
 
 - `cd frontend && npm run test:offline`: unit tests of the overlay (no browser).
 - `node tests/offline_e2e.mjs <site> <staff-email> <staff-pw>`: browser test with the network cut (needs Chrome and `puppeteer-core`).
-- `node tests/offline_review_e2e.mjs <site> <staff-email> <staff-pw>`: edge cases: two tabs, discard while sending, dependent changes, another person's changes, storage failure, 504 answers, slow start, finishing a treatment, logging out offline.
+- `node tests/offline_review_e2e.mjs <site> <staff-email> <staff-pw> [<other-staff-email> <other-staff-pw>]`: edge cases: two tabs, discard while sending, dependent changes, another person's changes, storage failure, 504 answers, slow start, finishing a treatment, someone else signing in from another tab (needs the second user), logging out offline.
 - `python3 tests/api_smoke.py` and `tests/health_smoke.py`: a change sent twice is recorded once.
 
 ## Limits
