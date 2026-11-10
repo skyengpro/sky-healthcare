@@ -21,6 +21,8 @@ function stockDeltas(items) {
     if (m === 'add_stock') add(i.data.medicine, num(i.data.qty))
     else if (m === 'give_out') add(i.data.medicine, -num(i.data.qty))
     else if (m === 'record_procedure' && i.data.complete) for (const r of i.data.items || []) add(r.medicine, -num(r.qty))
+    // finishing a planned treatment: the medicines it uses are named by the screen that asked (meta.items)
+    else if (m === 'complete_procedure') for (const r of (i.meta || {}).items || []) add(r.medicine, -num(r.qty))
   }
   return d
 }
@@ -75,7 +77,7 @@ function patientRow(i, name) {
   }
 }
 
-const localDate = (ts) => {
+export const localDate = (ts) => {
   const d = new Date(ts)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
@@ -138,6 +140,7 @@ function movementRows(items, filter = {}) {
     if (m === 'add_stock') push(i, 'in', i.data.medicine, i.data.qty, 'Received')
     else if (m === 'give_out') push(i, 'out', i.data.medicine, i.data.qty, i.data.reason, i.data.recipient)
     else if (m === 'record_procedure' && Number(i.data.complete)) for (const r of i.data.items || []) push(i, 'out', r.medicine, r.qty, 'Used in a procedure', (i.meta || {}).patient_name)
+    else if (m === 'complete_procedure') for (const r of (i.meta || {}).items || []) push(i, 'out', r.medicine, r.qty, 'Used in a procedure', (i.meta || {}).patient_name)
   }
   return rows.reverse()
 }
@@ -178,7 +181,7 @@ export function overlay(method, params, data, outbox) {
       let m = data ? { ...data } : { ...medicineRow(created, code), movements: [], batches: [] }
       if (edit) Object.assign(m, { name: edit.data.name, category: edit.data.category, form: edit.data.form || '', strength: edit.data.strength || '', location: edit.data.location || '', minimum: num(edit.data.minimum) })
       if (n) m = withStatus({ ...m, stock: Math.max(0, num(m.stock) + n) })
-      const own = movementRows(items.filter((i) => [code, m.name].includes(i.data.medicine) || (i.data.items || []).some((r) => [code, m.name].includes(r.medicine))), {}).filter((r) => [code, m.name].includes(r.medicine))
+      const own = movementRows(items.filter((i) => [code, m.name].includes(i.data.medicine) || (i.data.items || []).concat((i.meta || {}).items || []).some((r) => [code, m.name].includes(r.medicine))), {}).filter((r) => [code, m.name].includes(r.medicine))
       return { ...m, movements: [...own, ...(m.movements || [])], pending: true }
     }
     case 'patients': {

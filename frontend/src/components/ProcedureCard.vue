@@ -63,7 +63,7 @@ function complete() {
     onConfirm: async () => {
       busy.value = true
       try {
-        const res = await write(H('complete_procedure'), { name: props.p.name }, t('Mark as done'), { summary: props.p.procedure_template })
+        const res = await write(H('complete_procedure'), { name: props.p.name }, t('Mark as done'), { summary: props.p.procedure_template, meta: { patient_name: props.p.patient_name, items: props.p.items.map((r) => ({ medicine: r.medicine, qty: r.qty })) } })
         saved(res, t('Treatment recorded'))
         changed()
       } catch (e) {

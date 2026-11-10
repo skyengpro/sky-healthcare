@@ -155,3 +155,11 @@ test('changes that failed or are not waiting any more are not shown', () => {
   const failed = item('give_out', { medicine: 'Para', qty: 8 }, { status: 'failed' })
   assert.equal(overlay('medicines', {}, [med], [failed])[0].stock, 10)
 })
+
+test('finishing a planned treatment offline uses up the medicines it names', () => {
+  const done = [item('health.complete_procedure', { name: 'CP-1' }, { meta: { items: [{ medicine: 'Para', qty: 3 }] } })]
+  assert.equal(overlay('medicines', {}, [med], done)[0].stock, 7)
+  const moves = overlay('movements', { kind: 'out' }, [], done)
+  assert.equal(moves.length, 1)
+  assert.equal(moves[0].qty, 3)
+})

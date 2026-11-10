@@ -17,7 +17,7 @@ const check = (label, ok, extra = '') => {
 const { b, p } = await start()
 const server = await serverClient(SITE, S_USER, S_PW)
 const api = (m, q = '') => p.evaluate(async (m, q) => (await (await fetch('/api/method/sky_healthcare.' + m + q)).json()).message, m, q)
-const outbox = () => p.evaluate(() => new Promise((res) => { const r = indexedDB.open('sky_healthcare'); r.onsuccess = () => { const q = r.result.transaction('meta').objectStore('meta').get('outbox'); q.onsuccess = () => res(q.result || []) } }))
+const outbox = () => p.evaluate(() => new Promise((res) => { const r = indexedDB.open('sky_healthcare'); r.onsuccess = () => { const q = r.result.transaction('outbox').objectStore('outbox').getAll(); q.onsuccess = () => res((q.result || []).sort((a, b) => (a.order || a.at) - (b.order || b.at))) } }))
 const drain = async (n = 40) => { for (let i = 0; i < n && (await outbox()).filter((x) => x.status === 'waiting' || x.status === 'sending').length; i++) await sleep(1000) }
 const flat = async () => (await text(p)).replace(/\n+/g, ' ')
 const pickDate = async (value) => {
@@ -158,7 +158,7 @@ check('refused: discarding removes it', (await outbox()).length === 0)
 // ============================================================ C. the server answers with an error
 await p.keyboard.press('Escape'); await sleep(400)
 await clickText(p, 'Medicines', 'a'); await sleep(800)
-const s3 = await p.waitForSelector('input[placeholder^="Search"]'); await s3.click({ clickCount: 3 }); await s3.type(existing.name); await sleep(600)
+const s3 = await p.waitForSelector('input[placeholder^="Search"]'); await s3.click(); await p.keyboard.down('Control'); await p.keyboard.press('KeyA'); await p.keyboard.up('Control'); await p.keyboard.press('Backspace'); await s3.type(existing.name); await sleep(600)
 await p.setOfflineMode(true); await sleep(1500)
 await sleep(3000)
 await clickText(p, 'Stock', 'button', 'main'); await sleep(700)

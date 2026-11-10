@@ -162,7 +162,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
-import { Dropdown, Popover, dialog } from 'frappe-ui'
+import { Dropdown, Popover } from 'frappe-ui'
 import Logo from './Logo.vue'
 import Btn from './Btn.vue'
 import Initials from './Initials.vue'
@@ -176,11 +176,11 @@ import PatientDialog from './PatientDialog.vue'
 import TemplateDialog from './TemplateDialog.vue'
 import ProcedureDialog from './ProcedureDialog.vue'
 import CancelProcedureDialog from './CancelProcedureDialog.vue'
-import { net, clearOutbox } from '@/api'
+import { net } from '@/api'
 import { alerts, alertCount, loadAlerts } from '@/alerts'
 import { lang, setLanguage, t } from '@/i18n'
 import { isDark, setTheme } from '@/theme'
-import { session, logout } from '@/session'
+import { session, confirmLogout } from '@/session'
 import { ui, openAddStock } from '@/ui'
 
 // desktop remembers its own choice; tablets start as an icon rail so the page keeps its room
@@ -237,19 +237,6 @@ const userMenu = computed(() => [
   { label: lang.value === 'fr' ? 'English' : 'Français', icon: 'lucide-languages', onClick: () => setLanguage(lang.value === 'fr' ? 'en' : 'fr') },
   { label: t('Log out'), icon: 'lucide-log-out', theme: 'red', onClick: confirmLogout },
 ])
-
-function confirmLogout() {
-  if (!net.outbox.length) return logout()
-  dialog.danger({
-    title: t('Log out?'),
-    message: t('{0} change(s) on this device are not sent yet. If you log out now, they are lost.', net.outbox.length),
-    confirmLabel: t('Log out'),
-    onConfirm: () => {
-      clearOutbox()
-      logout()
-    },
-  })
-}
 
 onMounted(loadAlerts)
 watch(() => ui.version, loadAlerts)

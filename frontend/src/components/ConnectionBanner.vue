@@ -34,6 +34,7 @@ const tone = {
   back: 'border-apo/20 bg-apo-soft text-apo',
   auth: 'border-alert/20 bg-alert-soft text-alert',
   failed: 'border-alert/20 bg-alert-soft text-alert',
+  storage: 'border-alert/20 bg-alert-soft text-alert',
 }
 const icon = {
   offline: 'lucide-wifi-off',
@@ -42,6 +43,7 @@ const icon = {
   back: 'lucide-wifi',
   auth: 'lucide-log-in',
   failed: 'lucide-triangle-alert',
+  storage: 'lucide-hard-drive',
 }
 
 const waiting = computed(() => net.outbox.filter((i) => i.status === 'waiting' || i.status === 'sending').length)
@@ -80,6 +82,7 @@ watch(
 )
 
 const phase = computed(() => {
+  if (net.storageFailed && net.outbox.length) return 'storage'
   if (net.authNeeded && waiting.value) return 'auth'
   if (!net.online) return offlineShown.value ? 'offline' : null
   if (net.syncing || waiting.value) return 'syncing'
@@ -101,6 +104,7 @@ const title = computed(
       back: t('Back online.'),
       auth: t('Your session ended.'),
       failed: t('{0} change(s) could not be sent.', failed.value),
+      storage: t("Changes can't be kept on this device."),
     })[view.value],
 )
 const detail = computed(() => {
@@ -110,6 +114,7 @@ const detail = computed(() => {
   return {
     offline: (n ? t('{0} change(s) saved on this device, sent automatically later.', n) : t('Everything you do is saved on this device and sent when you are back online.')) + stamp,
     failed: t('The server refused them. Review to try again or discard.'),
+    storage: t('The storage of this device is full or blocked. Keep this page open until they are sent.'),
     syncing: t('Sending {0} change(s)…', n || 1),
     synced: '',
     back: '',

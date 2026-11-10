@@ -423,4 +423,33 @@ check(
 	"cancelling a treatment twice is accepted",
 	staff.post("health.cancel_procedure", {"name": pc["name"], "reason": "test"})["name"] == pc["name"],
 )
+# finished without a connection: the treatment is dated the day it was done, never in the future
+import datetime as _dt
+
+_day = lambda n: str(_dt.date.today() + _dt.timedelta(days=n))  # noqa: E731
+
+
+def _start_date(name):
+	rows = staff.get("health.patient", {"name": r1["name"]})["procedures"]
+	return next(str(r["start_date"]) for r in rows if r["name"] == name)
+
+
+for offset, expected in ((-3, _day(-3)), (5, _day(0))):
+	dated = staff.post(
+		"health.record_procedure",
+		{
+			"patient": r1["name"],
+			"template": tpl["name"],
+			"items": [],  # no medicines: nothing was in the store on those past days
+			"complete": 0,
+			"date": _day(1),
+			"client_id": str(_uuid.uuid4()),
+		},
+	)
+	staff.post("health.complete_procedure", {"name": dated["name"], "date": _day(offset)})
+	check(
+		f"a treatment finished with date {_day(offset)} is dated {expected}",
+		_start_date(dated["name"]) == expected,
+	)
+	staff.post("health.cancel_procedure", {"name": dated["name"], "reason": "test"})
 print(f"\n{ok} checks passed")
