@@ -5,6 +5,7 @@
       <PageHeader :title="p.patient_name" back="/patients" :back-label="t('Patients')">
         <template #meta>
           <div class="mt-3 flex flex-wrap items-center gap-2">
+            <PendingTag :show="p.pending" />
             <span v-for="chip in chips" :key="chip" class="rounded-full bg-paper-deep px-2.5 py-1 text-[12.5px] text-ink-soft">{{ chip }}</span>
           </div>
         </template>
@@ -125,6 +126,7 @@
 </template>
 
 <script setup>
+import PendingTag from '@/components/PendingTag.vue'
 import PendingChanges from '@/components/PendingChanges.vue'
 import { pendingForPatient } from '@/offline/pending'
 import { net } from '@/api'

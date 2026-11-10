@@ -70,7 +70,7 @@
         <Btn size="sm" :label="t('Details')" @click="ui.sync.open = true" />
       </div>
       <div class="mt-5 border-t border-line pt-5">
-        <Btn variant="danger" icon="lucide-log-out" :label="t('Log out')" @click="logout" />
+        <Btn variant="danger" icon="lucide-log-out" :label="t('Log out')" @click="confirmLogout" />
       </div>
     </Panel>
   </div>
@@ -86,7 +86,7 @@ import Panel from '@/components/Panel.vue'
 import Logo from '@/components/Logo.vue'
 import { net, post } from '@/api'
 import { lang, setLanguage, t } from '@/i18n'
-import { session, logout } from '@/session'
+import { session, confirmLogout } from '@/session'
 import { setTheme, themeMode } from '@/theme'
 import { ui } from '@/ui'
 

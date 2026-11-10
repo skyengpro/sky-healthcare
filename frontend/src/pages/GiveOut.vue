@@ -134,7 +134,7 @@ async function save() {
   saving.value = true
   try {
     const name = picked.value?.name || form.medicine
-    const res = await write('give_out', { ...form }, t('Give out'), { summary: `${name} × ${num(form.qty)}` })
+    const res = await write('give_out', { ...form }, t('Give out'), { summary: `${name} × ${num(form.qty)}`, meta: { medicine_name: name } })
     saved(res, t('Stock out recorded'), `${num(form.qty)} × ${name}`)
     reset()
     changed()

@@ -42,3 +42,19 @@ export async function selectLabel(p, label, value) {
   if (!h) throw new Error('no select ' + label)
   await h.select(value)
 }
+
+// ---- the server, called directly (not through the page): used to change things while the page is offline
+export async function serverClient(site, user, pwd) {
+  const login = await fetch(site + '/api/method/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usr: user, pwd }) })
+  const cookie = login.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ')
+  const boot = await (await fetch(site + '/api/method/sky_healthcare.api.boot', { headers: { cookie } })).json()
+  const csrf = boot.message.csrf_token
+  const call = async (method, body) => {
+    const r = await fetch(site + '/api/method/' + (method.includes('.') ? method : 'sky_healthcare.api.' + method), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', cookie, 'X-Frappe-CSRF-Token': csrf }, body: JSON.stringify(body),
+    })
+    return { status: r.status, body: await r.json().catch(() => ({})) }
+  }
+  const read = async (method, query = '') => (await (await fetch(site + '/api/method/' + (method.includes('.') ? method : 'sky_healthcare.api.' + method) + query, { headers: { cookie } })).json()).message
+  return { call, read }
+}

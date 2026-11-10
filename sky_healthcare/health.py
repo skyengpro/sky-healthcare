@@ -628,8 +628,11 @@ def record_procedure(
 
 @frappe.whitelist(methods=["POST"])
 @_writes(admin=False)
-def complete_procedure(name: str):
-	"""Finish a planned procedure: its medicines leave the store now."""
+def complete_procedure(name: str, date: str | None = None):
+	"""Finish a planned procedure: its medicines leave the store now.
+
+	`date` is the day it was done when the change was made without a connection (never later than today).
+	"""
 	_require_health()
 	cp = frappe.get_doc("Clinical Procedure", name)
 	if cp.docstatus == 1 and cp.status == "Completed":
@@ -637,8 +640,9 @@ def complete_procedure(name: str):
 	if cp.docstatus != 1 or cp.status == "Cancelled":
 		frappe.throw(_("This treatment was cancelled"))
 	if cp.status != "Completed":  # it happens today, whatever day it was planned for
-		cp.db_set("start_date", getdate())
-		cp.start_date = getdate()
+		done_on = min(getdate(date or nowdate()), getdate())
+		cp.db_set("start_date", done_on)
+		cp.start_date = done_on
 	return {"name": cp.name, "stock_entry": _complete(cp)}
 
 

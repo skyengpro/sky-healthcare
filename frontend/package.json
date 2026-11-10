@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --base /sky-healthcare/",
     "build": "vite build",
-    "icons": "node scripts/icons.mjs"
+    "icons": "node scripts/icons.mjs",
+    "test:offline": "node --test tests/pending.test.mjs"
   },
   "dependencies": {
     "@fontsource-variable/figtree": "^5.1.2",

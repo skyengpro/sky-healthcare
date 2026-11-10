@@ -49,6 +49,7 @@
           </div>
           <div class="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end">
             <StatusBadge :status="r.state" />
+            <PendingTag :show="r.pending" />
             <div v-if="session.isAdmin && r.state === 'pending'" class="flex gap-2" @click.stop @keydown.enter.stop>
               <Btn size="sm" variant="danger" :label="t('Reject')" @click="decide(r, 'reject')" />
               <Btn size="sm" variant="brand" icon="lucide-check" :label="t('Approve')" @click="decide(r, 'approve')" />
@@ -62,6 +63,7 @@
 </template>
 
 <script setup>
+import PendingTag from '@/components/PendingTag.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { dialog, toast } from 'frappe-ui'

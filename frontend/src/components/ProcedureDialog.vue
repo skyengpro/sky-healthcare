@@ -130,7 +130,7 @@ async function save() {
     const res = await write(H('record_procedure'), {
       patient: form.patient, template: form.template, date: form.date, notes: form.notes, complete: done ? 1 : 0, service_request: ui.procedure.serviceRequest || undefined,
       items: items.map((r) => ({ medicine: r.medicine, qty: Number(r.qty) })),
-    }, done ? t('Record a treatment') : t('Plan a treatment'), { summary: form.template, stub: () => ({ status: done ? 'Completed' : 'Pending' }) })
+    }, done ? t('Record a treatment') : t('Plan a treatment'), { creates: 'procedure', summary: form.template, stub: () => ({ status: done ? 'Completed' : 'Pending' }) })
     ui.procedure.open = false
     saved(res, res.status === 'Completed' ? t('Treatment recorded') : t('Treatment planned'),
       res.status === 'Completed' && items.length ? t('{0} medicine(s) taken from stock', items.length) : '')

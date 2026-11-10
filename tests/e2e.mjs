@@ -241,7 +241,7 @@ const waitingCount = (page) =>
       new Promise((resolve) => {
         const open = indexedDB.open('sky_healthcare')
         open.onsuccess = () => {
-          const get = open.result.transaction('meta').objectStore('meta').get('outbox')
+          const get = open.result.transaction('outbox').objectStore('outbox').getAll()
           get.onsuccess = () => resolve((get.result || []).length)
         }
       }),
