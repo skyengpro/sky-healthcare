@@ -58,7 +58,8 @@
         <Logo mark-only mark-class="size-12" />
         <p class="text-[13.5px] leading-relaxed text-ink-soft">{{ t('On Android, open the browser menu and tap "Install app" or "Add to Home screen". On iPhone, tap Share, then "Add to Home Screen". The app then opens like any other app and keeps working offline.') }}</p>
       </div>
-      <Btn v-if="installEvent" class="mt-4" variant="brand" icon="lucide-download" :label="t('Install now')" @click="install" />
+      <p v-if="install.installed" class="mt-4 flex items-center gap-2 text-[13px] font-semibold text-apo-deep"><span class="lucide-circle-check size-4" />{{ t('The app is installed on this device.') }}</p>
+      <Btn v-else-if="install.offer" class="mt-4" variant="brand" icon="lucide-download" :label="t('Install now')" @click="installApp" />
     </Panel>
 
     <Panel :title="t('This device')" padded>
@@ -89,12 +90,11 @@ import { lang, setLanguage, t } from '@/i18n'
 import { session, confirmLogout } from '@/session'
 import { setTheme, themeMode } from '@/theme'
 import { ui } from '@/ui'
+import { morePages } from '@/nav'
+import { install, installApp } from '@/install'
 
-const shortcuts = computed(() => [
-  { name: 'requests', label: 'Medical requests', icon: 'lucide-clipboard-list' },
-  { name: 'reports', label: 'Reports', icon: 'lucide-chart-no-axes-column' },
-  ...(session.isAdmin ? [{ name: 'staff', label: 'Staff', icon: 'lucide-id-card' }] : []),
-])
+// the pages the phone tab bar has no room for (the same list as the account menu)
+const shortcuts = computed(() => morePages(session))
 
 const themes = [
   { v: 'light', label: 'Light', icon: 'lucide-sun' },
@@ -104,16 +104,6 @@ const themes = [
 const pw = reactive({ old: '', new: '' })
 const pwError = ref('')
 const pwSaving = ref(false)
-const installEvent = ref(null)
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault()
-  installEvent.value = e
-})
-
-async function install() {
-  installEvent.value?.prompt()
-  installEvent.value = null
-}
 
 async function changePassword() {
   pwError.value = ''

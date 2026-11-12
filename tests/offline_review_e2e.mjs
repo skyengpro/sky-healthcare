@@ -258,6 +258,125 @@ if (OTHER_USER) {
   check('session switch: once signed in again, it is sent once', (await patientsLike(N)).length === 1)
 } else console.log('SKIP session switch (pass a second staff user: <other-email> <other-pw>)')
 
+// ===================================================================== 8c. work done two days earlier is dated that day, not the day it syncs
+{
+  const pats = (await patientsLike('Offline')).filter((x) => x.name && !x.name.startsWith('local:'))
+  const patient = pats[0]
+  // a medicine whose stock arrived 6 days ago, so a give-out dated 2 days ago is valid (a movement dated before the stock existed is refused)
+  const med = { name: 'ZZ Clock ' + rand() }
+  const dayAgo = (n) => new Date(Date.now() - n * 86400000).toLocaleDateString('en-CA')
+  await server.call('save_medicine', { name: med.name, category: 'Analgesic', unit: 'Tablet', qty: 20, date: dayAgo(6), expiry: '2030-01-01', client_id: 'cid-' + rand() })
+  const twoDaysAgo = new Date(Date.now() - 2 * 86400000).toLocaleDateString('en-CA')
+  const back = await b.newPage(); await back.setViewport({ width: 1280, height: 860 })
+  // this tab's clock runs two days behind (as on a device that was left offline, or set wrong)
+  await back.evaluateOnNewDocument(() => {
+    const R = Date, off = -2 * 86400000
+    class D extends R { constructor(...a) { a.length ? super(...a) : super(R.now() + off) } static now() { return R.now() + off } }
+    window.Date = D
+  })
+  await back.goto(SITE + '/sky-healthcare/patients/' + encodeURIComponent(patient.name), { waitUntil: 'networkidle0' })
+  await back.waitForFunction(() => document.body.innerText.includes('New consultation'), { timeout: 20000 })
+  await back.goto(SITE + '/sky-healthcare/give-out', { waitUntil: 'networkidle0' }) // keep the lists, with the new medicine, on the device
+  await back.waitForFunction(() => document.body.innerText.includes('Record stock out'), { timeout: 20000 })
+  await sleep(2500)
+  await back.setOfflineMode(true); await sleep(1500)
+  await back.goto(SITE + '/sky-healthcare/patients/' + encodeURIComponent(patient.name), { waitUntil: 'domcontentloaded' }).catch(() => {})
+  await back.waitForFunction(() => document.body.innerText.includes('New consultation'), { timeout: 20000 })
+  await sleep(1500)
+  await clickText(back, 'New consultation'); await sleep(1200)
+  await fillLabel(back, 'What the doctor observed', 'Clock test two days ago', 'textarea')
+  await clickText(back, 'Finish consultation'); await sleep(1500)
+  await back.goto(SITE + '/sky-healthcare/give-out', { waitUntil: 'domcontentloaded' }).catch(() => {})
+  await back.waitForFunction(() => document.body.innerText.includes('Record stock out'), { timeout: 20000 })
+  await sleep(800)
+  await fillLabel(back, 'Medicine', med.name.slice(0, 12))
+  const opt = await back.waitForSelector(`::-p-xpath(//*[@role="option"][.//text()[normalize-space(.)=${JSON.stringify(med.name)}]])`, { visible: true, timeout: 8000 })
+  await opt.click(); await sleep(400)
+  await fillLabel(back, 'Quantity', '1')
+  await clickText(back, 'Other authorized adjustment', 'button').catch(() => {})
+  await fillLabel(back, 'Note', 'clock test').catch(() => {})
+  await clickText(back, 'Record stock out'); await sleep(1500)
+  await back.setOfflineMode(false)
+  const sent = await waitFor(async () => (await outbox(back)).length === 0, 40)
+  const file = await server.read(H('patient'), '?name=' + encodeURIComponent(patient.name))
+  const c = (file.consultations || []).find((x) => x.encounter_comment === 'Clock test two days ago')
+  check('clock: the consultation is recorded on that day on the server', sent && c?.encounter_date === twoDaysAgo, `${c?.encounter_date} vs ${twoDaysAgo}, sent=${sent} left=${JSON.stringify((await outbox(back)).map((x) => [x.method.split('.').pop(), x.status, x.error]))}`)
+  const mv = (await server.read('movements', '?kind=out&limit=300')).find((m) => m.recipient === 'clock test')
+  check('clock: the stock movement is dated that day on the server', mv && String(mv.date) === twoDaysAgo, String(mv?.date))
+  await back.close()
+}
+
+// ===================================================================== 8d. cancelling a waiting treatment while the app is sending removes it for good
+{
+  const pat = (await patientsLike('Offline')).filter((x) => !x.name.startsWith('local:'))[0]
+  const X = 'Hold' + rand()
+  const before = ((await server.read(H('patient'), '?name=' + encodeURIComponent(pat.name))).procedures || []).length
+  await P.goto(SITE + '/sky-healthcare/patients/' + encodeURIComponent(pat.name), { waitUntil: 'networkidle0' })
+  await P.waitForFunction(() => document.body.innerText.includes('Record a treatment'), { timeout: 20000 })
+  await sleep(1500)
+  await P.setOfflineMode(true); await sleep(1500)
+  await putItem(item('sky_healthcare.health.save_patient', { first_name: X, last_name: 'Review', sex: 'Female' }), P) // first in line: it is the one being sent
+  await clickText(P, 'Record a treatment', 'button|a', 'main'); await sleep(900)
+  await clickText(P, 'Fever care', 'button', '*[@role="dialog"]'); await sleep(300)
+  await clickText(P, 'Planned', 'button', '*[@role="dialog"]'); await sleep(300)
+  await clickText(P, 'Save as planned', 'button', '*[@role="dialog"]'); await sleep(1500)
+  await P.evaluate(() => [...document.querySelectorAll('button')].find((x) => x.innerText.trim().startsWith('Treatments'))?.click())
+  await sleep(600)
+  const waiting = (await outbox(P)).filter((x) => x.method.endsWith('record_procedure'))
+  check('discard: a planned treatment is waiting', waiting.length === 1)
+  await P.setRequestInterception(true)
+  let held = false
+  P.on('request', async (req) => {
+    if (req.method() === 'POST' && req.url().includes('save_patient') && !held) { held = true; await sleep(6000) }
+    req.continue().catch(() => {})
+  })
+  await P.setOfflineMode(false)
+  await P.evaluate(() => window.dispatchEvent(new Event('online')))
+  await waitFor(async () => held, 15)
+  // while the first change is on its way, the person cancels the waiting treatment in this same tab
+  const clicked = await P.evaluate(() => { const card = [...document.querySelectorAll('article')].find((a) => a.innerText.includes('Waiting to be sent')); const b = card && [...card.querySelectorAll('button')].find((x) => x.innerText.trim() === 'Cancel'); b?.click(); return !!b })
+  check('discard: the waiting treatment has its own Cancel button', clicked)
+  await sleep(600)
+  await clickText(P, 'Cancel treatment', 'button', '*[@role="dialog"]').catch(() => clickText(P, 'Confirm', 'button', '*[@role="dialog"]')).catch(() => {})
+  await sleep(1000)
+  await waitFor(async () => (await outbox(P)).length === 0, 30)
+  await sleep(1500)
+  P.removeAllListeners('request'); await P.setRequestInterception(false)
+  const after = ((await server.read(H('patient'), '?name=' + encodeURIComponent(pat.name))).procedures || []).length
+  check('discard: the first change was sent', (await patientsLike(X)).length === 1)
+  check('discard: the cancelled treatment never reached the server', after === before, `${before} -> ${after}`)
+  const left = await outbox(P)
+  check('discard: nothing is left waiting', left.length === 0, JSON.stringify(left.map((x) => [x.method.split('.').pop(), x.status, x.error])))
+  for (const i of left) await delItem(i.id, P)
+}
+
+// ===================================================================== 8e. a tab that still holds a change another tab already sent does not send it again
+{
+  const made = await server.call(H('save_patient'), { first_name: 'Stale' + rand(), last_name: 'Review', sex: 'Female', client_id: 'cid-' + rand() })
+  const name = made.body.message.name
+  await P.setOfflineMode(true)
+  const edit = item('sky_healthcare.health.save_patient', { name, first_name: 'StaleOld', last_name: 'Review', sex: 'Female' })
+  await putItem(edit, P)
+  const t2 = await b.newPage(); await t2.setViewport({ width: 1280, height: 860 })
+  await t2.setOfflineMode(true) // offline from the start, so it cannot send the edit before the test says so
+  await t2.goto(SITE + '/sky-healthcare/', { waitUntil: 'domcontentloaded' }).catch(() => {}); await t2.waitForFunction(() => document.body.innerText.includes('Medicines'), { timeout: 20000 })
+  await P.reload({ waitUntil: 'domcontentloaded' }).catch(() => {}); await sleep(3000)
+  await P.setOfflineMode(true)
+  check('stale: both tabs hold the same waiting edit', (await outbox(P)).length === 1 && (await outbox(t2)).length === 1, `${JSON.stringify((await outbox(P)).map((x) => [x.method.split('.').pop(), x.status, x.data.first_name]))}`)
+  await t2.bringToFront(); await t2.setOfflineMode(false)
+  await t2.evaluate(() => window.dispatchEvent(new Event('online')))
+  await waitFor(async () => (await outbox(t2)).length === 0, 30)
+  const first = (await server.read(H('patient'), '?name=' + encodeURIComponent(name))).patient_name
+  check('stale: the second tab sent the edit', first.startsWith('StaleOld'), first)
+  await server.call(H('save_patient'), { name, first_name: 'StaleNew', last_name: 'Review', sex: 'Female', client_id: 'cid-' + rand() }) // a newer edit
+  await P.bringToFront(); await P.setOfflineMode(false)
+  await P.evaluate(() => window.dispatchEvent(new Event('online')))
+  await sleep(8000)
+  const last = (await server.read(H('patient'), '?name=' + encodeURIComponent(name))).patient_name
+  check('stale: the first tab did not send the old edit again over the newer one', last.startsWith('StaleNew'), last)
+  await t2.close()
+}
+
 // ===================================================================== 9. logging out with unsent changes asks first, from the Account page too
 {
   await P.setOfflineMode(true); await sleep(1500)

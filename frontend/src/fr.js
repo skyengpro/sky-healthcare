@@ -442,6 +442,12 @@ export default {
   'On Android, open the browser menu and tap "Install app" or "Add to Home screen". On iPhone, tap Share, then "Add to Home Screen". The app then opens like any other app and keeps working offline.':
     'Sur Android, ouvrez le menu du navigateur et touchez « Installer l’application » ou « Ajouter à l’écran d’accueil ». Sur iPhone, touchez Partager puis « Sur l’écran d’accueil ». L’application s’ouvre alors comme les autres et fonctionne hors ligne.',
   'Install now': 'Installer',
+  'Opens from your home screen and works offline.': 'S’ouvre depuis l’écran d’accueil et fonctionne hors ligne.',
+  'Tap Share, then "Add to Home Screen".': 'Touchez Partager, puis « Sur l’écran d’accueil ».',
+  'Install': 'Installer',
+  'Not now': 'Plus tard',
+  'The app is installed on this device.': 'L’application est installée sur cet appareil.',
+  'New patient': 'Nouveau patient',
   'This device': 'Cet appareil',
   '{0} change(s) waiting to be sent': '{0} modification(s) en attente d’envoi',
   'Everything is sent.': 'Tout est envoyé.',
