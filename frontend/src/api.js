@@ -196,7 +196,11 @@ function stripHtml(s) {
 
 function messageFrom(json, status) {
   try {
-    const msgs = JSON.parse(json._server_messages || '[]').map((m) => JSON.parse(m).message)
+    // warnings (yellow/orange alerts) are not the reason a request failed: the server may add one before the real error
+    const msgs = JSON.parse(json._server_messages || '[]')
+      .map((m) => JSON.parse(m))
+      .filter((m) => !['yellow', 'orange'].includes(m.indicator))
+      .map((m) => m.message)
     if (msgs.length) return stripHtml(msgs[msgs.length - 1])
   } catch {}
   if (json.message && typeof json.message === 'string') return stripHtml(json.message)
@@ -396,8 +400,10 @@ function foldIntoPending(method, data) {
   const { name, code, client_id, ...rest } = data
   if (m === base || (m === 'update_consultation' && base === 'save_consultation')) Object.assign(target.data, rest)
   else if (m === 'complete_procedure' && base === 'record_procedure') Object.assign(target.data, { complete: 1, date: localDate(Date.now()) })
-  else if ((m === 'cancel_procedure' && base === 'record_procedure') || (m === 'discard_consultation' && base === 'save_consultation')) discard(target.id)
-  else return null
+  else if ((m === 'cancel_procedure' && base === 'record_procedure') || (m === 'discard_consultation' && base === 'save_consultation')) {
+    discard(target.id) // gone for good: it must not be written to the device again
+    return target
+  } else return null
   store(target)
   return target
 }
