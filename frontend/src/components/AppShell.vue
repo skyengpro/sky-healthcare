@@ -111,7 +111,7 @@
         </div>
 
         <div class="md:hidden">
-        <Dropdown :options="userMenu" align="end">
+        <Dropdown :options="phoneMenu" align="end">
           <template #default>
             <button class="rounded-full" :aria-label="t('My account')"><Initials :name="session.user.full_name" /></button>
           </template>
@@ -120,6 +120,7 @@
       </header>
 
       <ConnectionBanner />
+      <InstallBanner />
 
       <main class="mx-auto w-full max-w-[1200px] flex-1 px-4 pb-32 pt-3 md:px-8 md:pb-14 md:pt-5 lg:px-10">
         <slot />
@@ -130,7 +131,12 @@
     <nav class="fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-30 mx-auto max-w-[480px] md:hidden">
       <div class="grid grid-cols-5 items-center rounded-[24px] border border-line bg-card/95 px-1 py-1 shadow-lift backdrop-blur">
         <RouterLink v-for="item in mobileNav" :key="item.to" :to="item.to" custom v-slot="{ navigate, isActive, isExactActive }">
-          <a v-if="item.primary" :href="'/sky-healthcare' + item.to" class="flex flex-col items-center" :aria-label="t(item.short)" @click="navigate">
+          <button v-if="item.action" type="button" class="flex flex-col items-center" :aria-label="t(item.short)" :title="t(item.short)" @click="item.action">
+            <span class="flex size-12 items-center justify-center rounded-full bg-ink text-on-ink shadow-card">
+              <span :class="item.icon" class="size-5" />
+            </span>
+          </button>
+          <a v-else-if="item.primary" :href="'/sky-healthcare' + item.to" class="flex flex-col items-center" :aria-label="t(item.short)" @click="navigate">
             <span class="flex size-12 items-center justify-center rounded-full bg-ink text-on-ink shadow-card">
               <span :class="item.icon" class="size-5" />
             </span>
@@ -172,6 +178,7 @@ import AddStockDialog from './AddStockDialog.vue'
 import RequestDialog from './RequestDialog.vue'
 import SyncDialog from './SyncDialog.vue'
 import ConnectionBanner from './ConnectionBanner.vue'
+import InstallBanner from './InstallBanner.vue'
 import PatientDialog from './PatientDialog.vue'
 import TemplateDialog from './TemplateDialog.vue'
 import ProcedureDialog from './ProcedureDialog.vue'
@@ -181,7 +188,8 @@ import { alerts, alertCount, loadAlerts } from '@/alerts'
 import { lang, setLanguage, t } from '@/i18n'
 import { isDark, setTheme } from '@/theme'
 import { session, confirmLogout } from '@/session'
-import { ui, openAddStock } from '@/ui'
+import { ui, openAddStock, openPatient } from '@/ui'
+import { morePages } from '@/nav'
 
 // desktop remembers its own choice; tablets start as an icon rail so the page keeps its room
 const tablet = useMediaQuery('(min-width: 768px) and (max-width: 1023px)')
@@ -219,15 +227,25 @@ const sections = computed(() => [
   ...(session.isAdmin ? [{ label: 'Team', items: [{ to: '/staff', label: 'Staff', icon: 'lucide-id-card' }] }] : []),
 ])
 
-// phone: with Frappe Health, patients and procedures take the last two tabs; requests and reports move to the account menu
-const mobileNav = computed(() => [
-  { to: '/', short: 'Home', icon: 'lucide-layout-grid', exact: true },
-  { to: '/medicines', short: 'Medicines', icon: 'lucide-pill' },
-  { to: '/give-out', short: 'Give out', icon: 'lucide-hand-heart', primary: true },
-  ...(session.health
-    ? [{ to: '/patients', short: 'Patients', icon: 'lucide-users-round' }, { to: '/procedures', short: 'Types', icon: 'lucide-list-checks' }]
-    : [{ to: '/requests', short: 'Requests', icon: 'lucide-clipboard-list', badge: pending.value }, { to: '/reports', short: 'Reports', icon: 'lucide-chart-no-axes-column' }]),
-])
+// phone tab bar. With Frappe Health the big middle button registers a patient (the most frequent task at the
+// desk); without it, it records stock leaving the store. The other pages are in the account menu.
+const mobileNav = computed(() =>
+  session.health
+    ? [
+        { to: '/', short: 'Home', icon: 'lucide-layout-grid', exact: true },
+        { to: '/medicines', short: 'Medicines', icon: 'lucide-pill' },
+        { to: '#new-patient', short: 'New patient', icon: 'lucide-user-plus', action: () => openPatient() },
+        { to: '/patients', short: 'Patients', icon: 'lucide-users-round' },
+        { to: '/requests', short: 'Requests', icon: 'lucide-clipboard-list', badge: pending.value },
+      ]
+    : [
+        { to: '/', short: 'Home', icon: 'lucide-layout-grid', exact: true },
+        { to: '/medicines', short: 'Medicines', icon: 'lucide-pill' },
+        { to: '/give-out', short: 'Give out', icon: 'lucide-hand-heart', primary: true },
+        { to: '/requests', short: 'Requests', icon: 'lucide-clipboard-list', badge: pending.value },
+        { to: '/reports', short: 'Reports', icon: 'lucide-chart-no-axes-column' },
+      ],
+)
 
 const failed = computed(() => net.outbox.filter((i) => i.status === 'failed').length)
 
@@ -236,6 +254,11 @@ const userMenu = computed(() => [
   { label: isDark.value ? t('Light theme') : t('Dark theme'), icon: isDark.value ? 'lucide-sun' : 'lucide-moon', onClick: () => setTheme(isDark.value ? 'light' : 'dark') },
   { label: lang.value === 'fr' ? 'English' : 'Français', icon: 'lucide-languages', onClick: () => setLanguage(lang.value === 'fr' ? 'en' : 'fr') },
   { label: t('Log out'), icon: 'lucide-log-out', theme: 'red', onClick: confirmLogout },
+])
+// phone: the pages that are not in the tab bar come first, then the account items
+const phoneMenu = computed(() => [
+  { group: 'pages', hideLabel: true, options: morePages(session).map((p) => ({ label: t(p.label), icon: p.icon, route: { name: p.name } })) },
+  { group: 'account', hideLabel: true, options: userMenu.value },
 ])
 
 onMounted(loadAlerts)
