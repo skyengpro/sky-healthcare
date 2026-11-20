@@ -8,7 +8,7 @@ from frappe.utils.password import check_password, update_password
 
 from sky_healthcare import api, health
 from sky_healthcare.setup import install
-from sky_healthcare.tests.utils import make_medicine, make_patient, make_staff, receive, run_as
+from sky_healthcare.tests.utils import make_medicine, make_patient, make_staff, receive, run_as, unique
 
 
 class TestRequiredApps(IntegrationTestCase):
@@ -120,6 +120,96 @@ class TestMigration(IntegrationTestCase):
 		before = {doctype: frappe.db.count(doctype) for doctype in doctypes}
 		install.after_migrate()
 		self.assertEqual({doctype: frappe.db.count(doctype) for doctype in doctypes}, before)
+
+
+class TestStockAccounts(IntegrationTestCase):
+	FIELDS = ("enable_perpetual_inventory", "default_inventory_account", "stock_adjustment_account")
+
+	def setUp(self):
+		self.company = install.default_company()
+		saved = frappe.db.get_value("Company", self.company, self.FIELDS, as_dict=True)
+		self.addCleanup(frappe.db.set_value, "Company", self.company, saved)
+
+	def accounts(self):
+		return frappe.db.get_value("Company", self.company, self.FIELDS[1:])
+
+	def clear(self):
+		frappe.db.set_value(
+			"Company", self.company, {"default_inventory_account": None, "stock_adjustment_account": None}
+		)
+
+	def test_install_sets_both_accounts_with_the_types_erpnext_requires(self):
+		self.clear()
+		install.after_migrate()
+		inventory, adjustment = self.accounts()
+		self.assertEqual(
+			frappe.db.get_value("Account", inventory, ["is_group", "account_type", "root_type"]),
+			(0, "Stock", "Asset"),
+		)
+		self.assertEqual(
+			frappe.db.get_value("Account", adjustment, ["is_group", "account_type", "root_type"]),
+			(0, "Stock Adjustment", "Expense"),
+		)
+		self.assertEqual(install.missing_stock_accounts(self.company), [])
+
+	def test_syscohada_chart_gets_the_medical_stock_account_under_class_33(self):
+		parent = frappe.db.get_value(
+			"Account",
+			{"company": self.company, "account_number": install.OHADA_INVENTORY_PARENT, "is_group": 1},
+		)
+		if not parent:
+			self.skipTest("the company does not use a SYSCOHADA chart")
+		if frappe.db.exists(
+			"Account",
+			{
+				"company": self.company,
+				"account_type": "Stock",
+				"is_group": 0,
+				"parent_account": ["!=", parent],
+			},
+		):
+			self.skipTest("the chart already has another stock account, which is used instead")
+		self.clear()
+		install.configure_stock_accounts()
+		inventory = self.accounts()[0]
+		self.assertEqual(
+			frappe.db.get_value("Account", inventory, ["account_name", "parent_account"]),
+			(install.INVENTORY_ACCOUNT["ohada"], parent),
+		)
+
+	def test_running_again_creates_no_account(self):
+		self.clear()
+		install.configure_stock_accounts()
+		before = (frappe.db.count("Account", {"company": self.company}), self.accounts())
+		self.clear()
+		install.configure_stock_accounts()
+		install.configure_stock_accounts()
+		self.assertEqual((frappe.db.count("Account", {"company": self.company}), self.accounts()), before)
+
+	def test_accounts_chosen_by_an_administrator_are_kept(self):
+		install.configure_stock_accounts()
+		inventory = self.accounts()[0]
+		chosen = frappe.get_doc(
+			{
+				"doctype": "Account",
+				"company": self.company,
+				"account_name": unique("Pharmacy stock"),
+				"parent_account": frappe.db.get_value("Account", inventory, "parent_account"),
+				"account_type": "Stock",
+			}
+		).insert(ignore_permissions=True)
+		# runs before setUp's cleanup restores the Company, hence force
+		self.addCleanup(frappe.delete_doc, "Account", chosen.name, force=True, ignore_permissions=True)
+		frappe.db.set_value("Company", self.company, "default_inventory_account", chosen.name)
+		install.after_migrate()
+		self.assertEqual(self.accounts()[0], chosen.name)
+
+	def test_nothing_is_set_without_perpetual_inventory(self):
+		self.clear()
+		frappe.db.set_value("Company", self.company, "enable_perpetual_inventory", 0)
+		install.configure_stock_accounts()
+		self.assertEqual(self.accounts(), (None, None))
+		self.assertEqual(install.missing_stock_accounts(self.company), [])
 
 
 class TestDefaultAdmin(IntegrationTestCase):

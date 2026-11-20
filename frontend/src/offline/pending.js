@@ -57,7 +57,8 @@ function requestRow(i, old = {}) {
   const lines = (d.items || [d]).map((r) => ({ medicine: r.medicine, medicine_name: r.medicine_name || r.medicine, qty: r.qty, unit: r.unit || '' }))
   return {
     name: i.localId || i.id, date: new Date(i.at).toISOString().slice(0, 10), requested_by: '', can_edit: true, ...old,
-    ...lines[0], items: lines, urgency: d.urgency, reason: d.reason, state: 'pending', status: 'Pending', pending: true,
+    ...lines[0], items: lines, urgency: d.urgency, reason: d.reason, ...(d.needed_by ? { needed_by: d.needed_by } : {}),
+    state: 'pending', status: 'Pending', pending: true,
   }
 }
 

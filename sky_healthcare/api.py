@@ -708,11 +708,13 @@ def request_stock(
 	client_id: str | None = None,
 	items: list | str | None = None,
 	name: str | None = None,
+	needed_by: str | None = None,
 ):
 	"""Ask for medicines to be ordered, or change a request still waiting for a clinic administrator.
 
 	`items` holds the rows ({medicine, qty}). `medicine` and `qty` are the single-row form that
-	devices with an older version of the app can still have waiting to be sent.
+	devices with an older version of the app can still have waiting to be sent. Without `needed_by`
+	(older versions of the app), the date comes from the urgency.
 	"""
 	_require_staff()
 	if not name and (done := _existing("Material Request", client_id)):
@@ -720,9 +722,11 @@ def request_stock(
 	lines = _request_lines(medicine, qty, items)
 	if urgency not in URGENCY_DAYS:
 		urgency = "Routine"
+	if needed_by and getdate(needed_by) < getdate(nowdate()):
+		frappe.throw(_("The date needed cannot be in the past."))
 	if name:
-		return {"request": _update_request(name, lines, urgency, reason)}
-	need = add_days(nowdate(), URGENCY_DAYS[urgency])
+		return {"request": _update_request(name, lines, urgency, reason, needed_by)}
+	need = needed_by or add_days(nowdate(), URGENCY_DAYS[urgency])
 	warehouse = _warehouse()
 	mr = frappe.get_doc(
 		{
@@ -749,6 +753,46 @@ def request_stock(
 	return {"request": mr.name}
 
 
+REQUEST_SERIES = "SKY-MR-{year}-"
+
+
+def number_request(doc, method=None):
+	"""Material Request before_insert: give a purchase request its number, "2026-001", counted per year.
+
+	Covers requests made in the app, in the desk, and by ERPNext when stock is low.
+	"""
+	if doc.material_request_type != "Purchase" or doc.get("custom_request_number"):
+		return
+	doc.custom_request_number = _next_request_number(doc.transaction_date)
+
+
+def _next_request_number(day):
+	from frappe.model.naming import getseries
+
+	year = getdate(day or nowdate()).year
+	# the Series table row is locked until commit, so two requests never get the same number
+	return f"{year}-{getseries(REQUEST_SERIES.format(year=year), 3)}"
+
+
+def number_existing_requests():
+	"""Number the purchase requests that have no number yet, oldest first. Safe to run again."""
+	if not frappe.db.has_column("Material Request", "custom_request_number"):
+		return
+	for r in frappe.get_all(
+		"Material Request",
+		filters={"material_request_type": "Purchase", "custom_request_number": ["is", "not set"]},
+		fields=["name", "transaction_date"],
+		order_by="creation asc",
+	):
+		frappe.db.set_value(
+			"Material Request",
+			r.name,
+			"custom_request_number",
+			_next_request_number(r.transaction_date),
+			update_modified=False,
+		)
+
+
 def _request_lines(medicine, qty, items):
 	lines = frappe.parse_json(items) if items else [{"medicine": medicine, "qty": qty}]
 	seen = set()
@@ -768,7 +812,7 @@ def _can_edit_request(owner):
 	return owner == _owner() or _is_admin()
 
 
-def _update_request(name, lines, urgency, reason):
+def _update_request(name, lines, urgency, reason, needed_by=None):
 	mr = frappe.get_doc("Material Request", name)
 	if not _can_edit_request(mr.owner):
 		frappe.throw(
@@ -777,7 +821,9 @@ def _update_request(name, lines, urgency, reason):
 		)
 	if _request_status(mr) != "pending":
 		frappe.throw(_("This request has already been handled."))
-	if urgency != mr.custom_urgency:
+	if needed_by:
+		mr.schedule_date = needed_by
+	elif urgency != mr.custom_urgency:
 		mr.schedule_date = add_days(nowdate(), URGENCY_DAYS[urgency])
 	mr.custom_urgency = urgency
 	mr.custom_reason = reason or ""
@@ -835,7 +881,8 @@ def requests(status: str | None = None, limit: int | str = 100):
 	_require_staff()
 	rows = frappe.db.sql(
 		"""
-		select mr.name, mr.transaction_date as date, mr.schedule_date as needed_by, mr.docstatus, mr.status,
+		select mr.name, mr.custom_request_number as number, mr.transaction_date as date,
+			mr.schedule_date as needed_by, mr.docstatus, mr.status,
 			mr.custom_urgency as urgency, mr.custom_reason as reason, mr.custom_rejected, mr.custom_decision_note as note,
 			mr.auto_created_via_reorder as automatic, mr.owner
 		from `tabMaterial Request` mr
