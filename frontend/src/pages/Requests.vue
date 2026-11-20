@@ -35,14 +35,17 @@
           </div>
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              <span class="text-[15px] font-semibold text-ink">{{ r.medicine_name || r.medicine }}</span>
-              <span class="font-display text-[19px] leading-none text-ink-soft tabular">× {{ num(r.qty) }}</span>
-              <span v-if="r.items?.length > 1" class="text-[13px] font-medium text-ink-mute">{{ t('+{0} more', r.items.length - 1) }}</span>
+              <!-- a request saved offline gets its number once the server has it -->
+              <span class="text-[15px] font-semibold text-ink tabular">{{ r.number ? t('Medical request {0}', r.number) : t('New medical request') }}</span>
               <span v-if="r.urgency && r.urgency !== 'Routine'" class="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
                 :class="r.urgency === 'Emergency' ? 'bg-alert-soft text-alert' : 'bg-warn-soft text-warn'">{{ t(r.urgency) }}</span>
             </div>
+            <div class="mt-1 flex flex-wrap items-baseline gap-x-2 text-[13.5px] text-ink-soft">
+              <span>{{ r.medicine_name || r.medicine }} <span class="tabular">× {{ num(r.qty) }}</span></span>
+              <span v-if="r.items?.length > 1" class="text-[13px] font-medium text-ink-mute">{{ t('+{0} more', r.items.length - 1) }}</span>
+            </div>
             <div class="mt-1 text-[12.5px] text-ink-mute">
-              {{ r.requested_by }} · {{ date(r.date) }} · {{ t('needed by {0}', date(r.needed_by)) }}
+              {{ r.requested_by }} · {{ date(r.date) }}<template v-if="r.needed_by"> · {{ t('needed by {0}', date(r.needed_by)) }}</template>
             </div>
             <p v-if="r.reason" class="mt-2.5 font-display text-[16px] italic leading-snug text-ink-soft">“{{ r.reason }}”</p>
             <p v-if="r.note" class="mt-2 text-[12.5px] text-ink-mute"><span class="font-semibold">{{ t('Note') }}:</span> {{ r.note }}</p>

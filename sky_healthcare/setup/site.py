@@ -51,7 +51,9 @@ def setup(config: str | None = None):
 
 	_setup_wizard(cfg.get("company"), cfg.get("admin_user"), report)
 	install.after_install()
-	report["steps"].append("roles, custom fields, categories, units, notifications, Medical Store")
+	report["steps"].append(
+		"roles, custom fields, categories, units, notifications, stock accounts, Medical Store"
+	)
 	_system_settings(cfg.get("company") or {}, report)
 	_dosages(report)
 	_check_inventory_account(report)
@@ -161,11 +163,11 @@ def _dosages(report):
 
 def _check_inventory_account(report):
 	company = install.default_company()
-	if frappe.db.get_value("Company", company, "enable_perpetual_inventory") and not frappe.db.get_value(
-		"Company", company, "default_inventory_account"
-	):
+	missing = install.missing_stock_accounts(company)
+	if missing:
 		report["warnings"].append(
-			f"Company {company} has no Default Inventory Account: stock cannot be recorded until one is set."
+			f"Company {company} has no {', '.join(missing)} and its chart offers none: "
+			"stock cannot be recorded until one is set."
 		)
 
 

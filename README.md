@@ -64,7 +64,18 @@ node packages (`bench setup requirements --node`) runs `npm ci` in `frontend/`, 
 
 ## Requirements
 
-- Frappe, ERPNext and Frappe Health (`healthcare`) **version 16**, Python 3.14.
+- Python 3.14 and the app versions below. These are the versions the app is tested with; install these
+  exact tags so every site runs the same code.
+
+  | App | Version (git tag) | Commit |
+  |---|---|---|
+  | Frappe Framework (`frappe`) | `v16.60.2` | `2df0425571` |
+  | ERPNext (`erpnext`) | `v16.60.0` | `886ab6ae18` |
+  | Frappe Health (`healthcare`) | `v16.8.0` | `b243ec7445` |
+
+  Frappe 16.60 needs the system packages `libgl1` and `libglib2.0-0`. After moving a bench to new
+  versions, run `bench --site <site> migrate` on each of its sites. All sites share the code, so a site
+  left unmigrated fails, for example at login.
 - ERPNext and Healthcare must be on the bench. Installing this app also installs them on the site if they are missing.
 - A company must exist (ERPNext setup wizard done) when the app is installed. Otherwise create the store
   afterwards:
@@ -73,14 +84,17 @@ node packages (`bench setup requirements --node`) runs `npm ci` in `frontend/`, 
   bench --site <site> execute sky_healthcare.setup.install.create_warehouse
   ```
 
-- If the company uses perpetual inventory it needs a *Default Inventory Account* (Company settings),
-  or stock postings fail. The installer warns about this and does not change accounting settings.
+- Perpetual inventory stays on. The install gives the company the stock accounts it needs when they
+  are empty (on a SYSCOHADA chart: `336 - Médicaments et consommables médicaux` and `6033`), so stock
+  works without accounting setup. See [docs/default_install_configuration.md](docs/default_install_configuration.md#stock-accounts).
 
 ## Install on a site
 
 ```bash
-bench get-app erpnext --branch version-16
-bench get-app healthcare --branch version-16
+bench init frappe-bench --frappe-branch v16.60.2 --python python3.14
+cd frappe-bench
+bench get-app erpnext --branch v16.60.0
+bench get-app healthcare --branch v16.8.0
 bench get-app https://github.com/skyengpro/sky-healthcare --branch <branch>
 bench new-site <site> --admin-password <password>
 bench --site <site> install-app erpnext healthcare sky_healthcare

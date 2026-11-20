@@ -282,6 +282,7 @@ app_include_js = "/assets/sky_healthcare/js/clinical_defaults.js"
 doc_events = {
 	"*": {"on_change": "sky_healthcare.api.record_real_user"},
 	"Healthcare Practitioner": {"on_update": "sky_healthcare.health.open_practitioner_records"},
+	"Material Request": {"before_insert": "sky_healthcare.api.number_request"},
 }
 
 # Healthcare Management PWA, served at /sky-healthcare

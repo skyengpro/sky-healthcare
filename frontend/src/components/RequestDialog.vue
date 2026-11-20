@@ -1,5 +1,5 @@
 <template>
-  <Sheet v-model:open="ui.request.open" :title="t('Medical request')"
+  <Sheet v-model:open="ui.request.open" :title="doc?.number ? t('Medical request {0}', doc.number) : t('Medical request')"
     :message="doc ? '' : t('Ask for medicines to be ordered. An administrator approves the request. It does not add stock.')"
     icon="lucide-clipboard-list" theme="blue" size="2xl">
     <form class="space-y-4" @submit.prevent="save">
@@ -58,14 +58,18 @@
           <button v-for="u in urgencies" :key="u.value" type="button"
             class="rounded-full px-2 py-2 text-[13px] font-medium transition"
             :class="form.urgency === u.value ? u.active : 'text-ink-mute hover:text-ink'"
-            @click="form.urgency = u.value">{{ t(u.value) }}</button>
+            @click="setUrgency(u.value)">{{ t(u.value) }}</button>
         </div>
       </div>
+      <FormControl v-if="editable" variant="outline" :model-value="form.needed_by" type="date" format="D MMM YYYY" :label="t('Needed by')" size="lg"
+        :min="today()" :description="t('Set from the urgency. Change it if you need the medicines on another date.')"
+        @update:model-value="(v) => { form.needed_by = v; neededSetByHand = true }" />
       <FormControl v-if="editable" variant="outline" v-model="form.reason" type="textarea" :rows="3" :label="t('Reason (optional)')"
         :placeholder="t('e.g. Stock will run out next week')" size="lg" />
 
       <dl v-if="!editable" class="space-y-2 text-[14px]">
         <div class="flex gap-2"><dt class="text-ink-mute">{{ t('Urgency') }}:</dt><dd class="text-ink">{{ t(form.urgency) }}</dd></div>
+        <div v-if="form.needed_by" class="flex gap-2"><dt class="text-ink-mute">{{ t('Needed by') }}:</dt><dd class="text-ink">{{ date(form.needed_by) }}</dd></div>
         <div v-if="form.reason" class="flex gap-2"><dt class="text-ink-mute">{{ t('Reason') }}:</dt><dd class="min-w-0 break-words text-ink">{{ form.reason }}</dd></div>
         <div v-if="doc.note" class="flex gap-2"><dt class="text-ink-mute">{{ t('Note') }}:</dt><dd class="min-w-0 break-words text-ink">{{ doc.note }}</dd></div>
       </dl>
@@ -92,14 +96,27 @@ import { write } from '@/api'
 import { newRow } from '@/care'
 import { t } from '@/i18n'
 import { saved } from '@/offline/notify'
-import { date, num } from '@/format'
+import { date, num, today } from '@/format'
 import { ui, changed } from '@/ui'
 
+// days until the medicines are needed, as on the server (api.URGENCY_DAYS)
 const urgencies = [
-  { value: 'Routine', active: 'bg-ink text-on-ink' },
-  { value: 'Urgent', active: 'bg-warn-soft text-warn' },
-  { value: 'Emergency', active: 'bg-alert-soft text-alert' },
+  { value: 'Routine', days: 14, active: 'bg-ink text-on-ink' },
+  { value: 'Urgent', days: 3, active: 'bg-warn-soft text-warn' },
+  { value: 'Emergency', days: 0, active: 'bg-alert-soft text-alert' },
 ]
+function inDays(n) {
+  const d = new Date(`${today()}T00:00:00`)
+  d.setDate(d.getDate() + n)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const neededFor = (urgency) => inDays(urgencies.find((u) => u.value === urgency)?.days ?? 14)
+// the date follows the urgency until the user picks one
+let neededSetByHand = false
+function setUrgency(value) {
+  form.urgency = value
+  if (!neededSetByHand) form.needed_by = neededFor(value)
+}
 const doc = computed(() => ui.request.doc)
 const editable = computed(() => !doc.value || (doc.value.state === 'pending' && doc.value.can_edit))
 const hint = computed(() => {
@@ -110,7 +127,7 @@ const hint = computed(() => {
 })
 
 const blankRow = (medicine = null, qty = 1) => ({ ...newRow(medicine, qty), unit: '', medicine_name: '', checked: false })
-const form = reactive({ urgency: 'Routine', reason: '' })
+const form = reactive({ urgency: 'Routine', reason: '', needed_by: '' })
 const rows = ref([])
 const saving = ref(false)
 const error = ref('')
@@ -126,6 +143,9 @@ watch(() => ui.request.open, (open) => {
   const d = doc.value
   form.urgency = d?.urgency || 'Routine'
   form.reason = d?.reason || ''
+  // an existing request keeps its date; a new one starts from the urgency
+  neededSetByHand = Boolean(d?.needed_by)
+  form.needed_by = d?.needed_by || neededFor(form.urgency)
   rows.value = d
     ? d.items.map((r) => ({ ...blankRow(r.medicine, r.qty), unit: r.unit, medicine_name: r.medicine_name }))
     : [blankRow(ui.request.medicine, ui.request.qty || 1)]
@@ -151,6 +171,8 @@ async function save() {
   if (filled.some((r) => !(Number(r.qty) > 0))) return (error.value = t('Please enter a quantity above 0.'))
   const twice = filled.find((r, i) => filled.findIndex((o) => o.medicine === r.medicine) !== i)
   if (twice) return (error.value = t('{0} is listed twice. Keep one row and add up the quantity.', twice.medicine_name || twice.medicine))
+  if (!form.needed_by) return (error.value = t('Please choose the date the medicines are needed by.'))
+  if (form.needed_by < today()) return (error.value = t('The date needed cannot be in the past.'))
 
   const items = filled.map(({ medicine, medicine_name, qty, unit }) => ({ medicine, medicine_name, qty, unit }))
   const first = `${items[0].medicine_name || items[0].medicine} × ${num(items[0].qty)}`
@@ -158,7 +180,7 @@ async function save() {
   try {
     const res = await write(
       'request_stock',
-      { ...(doc.value ? { name: doc.value.name } : {}), items, urgency: form.urgency, reason: form.reason },
+      { ...(doc.value ? { name: doc.value.name } : {}), items, urgency: form.urgency, reason: form.reason, needed_by: form.needed_by },
       t('Medical request'),
       {
         summary: items.length > 1 ? `${first} ${t('+{0} more', items.length - 1)}` : first,

@@ -10,6 +10,15 @@ STOCK_SETTINGS = {
 	"pick_serial_and_batch_based_on": "Expiry",
 	"auto_indent": 1,
 }
+# Stock account created for the medical store when the chart has no usable one (non-group, type "Stock").
+# On a SYSCOHADA chart it goes under 33 "Autres approvisionnements": a clinic consumes its medicines in care.
+INVENTORY_ACCOUNT = {
+	"ohada": "Médicaments et consommables médicaux",
+	"other": "Medicines and Medical Supplies",
+}
+OHADA_INVENTORY_PARENT = "33"
+# SYSCOHADA counterpart of class 33 in the income statement, used as the Stock Adjustment Account
+OHADA_STOCK_ADJUSTMENT = "6033"
 CATEGORIES = [
 	"Analgesic",
 	"Antibiotic",
@@ -132,6 +141,17 @@ CUSTOM_FIELDS = {
 			"allow_on_submit": 1,
 			"insert_after": "custom_rejected",
 		},
+		# "2026-001": numbered per year, set when the request is created (sky_healthcare.api.number_request)
+		{
+			"fieldname": "custom_request_number",
+			"label": "Request No.",
+			"fieldtype": "Data",
+			"read_only": 1,
+			"no_copy": 1,
+			"search_index": 1,
+			"in_standard_filter": 1,
+			"insert_after": "custom_decision_note",
+		},
 	],
 }
 
@@ -250,9 +270,13 @@ def after_migrate():
 	"""
 	create_roles()
 	create_custom_fields(CUSTOM_FIELDS, update=True)
+	from sky_healthcare.api import number_existing_requests
+
+	number_existing_requests()
 	if erpnext_ready():
 		create_catalogue()
 		configure_stock()
+		configure_stock_accounts()
 	create_alerts()
 	setup_health()
 
@@ -362,6 +386,113 @@ def default_company():
 	return frappe.defaults.get_global_default("company") or frappe.db.get_value("Company", {}, "name")
 
 
+def missing_stock_accounts(company):
+	"""The Company fields that perpetual inventory needs and that are still empty."""
+	values = frappe.db.get_value(
+		"Company",
+		company,
+		["enable_perpetual_inventory", "default_inventory_account", "stock_adjustment_account"],
+		as_dict=True,
+	)
+	if not values or not values.enable_perpetual_inventory:
+		return []
+	return [f for f in ("default_inventory_account", "stock_adjustment_account") if not values.get(f)]
+
+
+def configure_stock_accounts(company=None):
+	"""Give a company with perpetual inventory the accounts its stock postings need.
+
+	Only fills Company fields that are empty: accounts an administrator chose are kept. Uses a suitable
+	account of the chart when there is one, and otherwise creates the medical stock account (SYSCOHADA
+	class 33) or types the SYSCOHADA stock variation account 6033. Safe to run again.
+	Run by hand: bench --site <site> execute sky_healthcare.setup.install.configure_stock_accounts
+	"""
+	company = company or default_company()
+	if not company:
+		return
+	missing = missing_stock_accounts(company)
+	if "default_inventory_account" in missing:
+		account = _inventory_account(company)
+		if account:
+			frappe.db.set_value("Company", company, "default_inventory_account", account)
+	if "stock_adjustment_account" in missing:
+		account = _stock_adjustment_account(company)
+		if account:
+			frappe.db.set_value("Company", company, "stock_adjustment_account", account)
+	still_missing = missing_stock_accounts(company)
+	if still_missing:
+		print(
+			f"Healthcare Management: company {company} uses perpetual inventory and its chart has no account "
+			f"for {', '.join(still_missing)}. Set it in the Company, or disable perpetual inventory, "
+			"before recording stock."
+		)
+
+
+def _leaf(company, **filters):
+	return frappe.db.get_value(
+		"Account", {"company": company, "is_group": 0, "disabled": 0, **filters}, "name", order_by="lft"
+	)
+
+
+def _group(company, **filters):
+	return frappe.db.get_value(
+		"Account", {"company": company, "is_group": 1, **filters}, "name", order_by="lft"
+	)
+
+
+def _inventory_account(company):
+	account = _leaf(company, account_type="Stock", root_type="Asset")
+	if account:
+		return account  # the chart already has one (e.g. "Stock In Hand" on the standard chart)
+	parent = _group(company, account_number=OHADA_INVENTORY_PARENT, root_type="Asset")
+	account_name = INVENTORY_ACCOUNT["ohada" if parent else "other"]
+	existing = _leaf(company, account_name=account_name)
+	if existing:
+		frappe.db.set_value("Account", existing, "account_type", "Stock")
+		return existing
+	parent = parent or _group(company, account_type="Stock", root_type="Asset")
+	if not parent:
+		return None
+	account = frappe.get_doc(
+		{
+			"doctype": "Account",
+			"company": company,
+			"account_name": account_name,
+			"account_number": _free_child_number(company, parent),
+			"parent_account": parent,
+			"account_type": "Stock",
+			"is_group": 0,
+		}
+	)
+	account.insert(ignore_permissions=True)
+	return account.name
+
+
+def _stock_adjustment_account(company):
+	account = _leaf(company, account_type="Stock Adjustment", root_type="Expense")
+	if account:
+		return account
+	# 6033 is used only while it has no type, so a type set by an accountant is kept
+	account = _leaf(
+		company, account_number=OHADA_STOCK_ADJUSTMENT, root_type="Expense", account_type=("is", "not set")
+	)
+	if account:
+		frappe.db.set_value("Account", account, "account_type", "Stock Adjustment")
+	return account
+
+
+def _free_child_number(company, parent):
+	"""Next free number under a numbered parent (33 -> 331..339), or None if the chart is not numbered."""
+	number = frappe.db.get_value("Account", parent, "account_number")
+	if not number:
+		return None
+	for digit in range(1, 10):
+		candidate = f"{number}{digit}"
+		if not frappe.db.exists("Account", {"company": company, "account_number": candidate}):
+			return candidate
+	return None
+
+
 def create_warehouse(company=None):
 	"""Create the "Medical Store" warehouse for a company (default company if none given).
 
@@ -370,14 +501,6 @@ def create_warehouse(company=None):
 	company = company or default_company()
 	if not company:
 		return  # no company yet (setup wizard not done); run create_warehouse after it
-	if frappe.db.get_value("Company", company, "enable_perpetual_inventory") and not frappe.db.get_value(
-		"Company", company, "default_inventory_account"
-	):
-		# stock entries would fail; this is an accounting decision, so it is reported, not changed
-		print(
-			f"Healthcare Management: company {company} uses perpetual inventory without a Default Inventory Account. "
-			"Set one in the Company, or disable perpetual inventory, before recording stock."
-		)
 	abbr = frappe.db.get_value("Company", company, "abbr")
 	name = f"Medical Store - {abbr}"
 	if not frappe.db.exists("Warehouse", name):
@@ -389,7 +512,7 @@ def create_warehouse(company=None):
 				"parent_warehouse": f"All Warehouses - {abbr}",
 			}
 		)
-		# a missing inventory account is reported above; it must not abort the install
+		# a missing inventory account is reported by configure_stock_accounts; it must not abort the install
 		warehouse.flags.ignore_inventory_account_validation = True
 		warehouse.insert(ignore_permissions=True)
 
