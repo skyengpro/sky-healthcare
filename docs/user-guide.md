@@ -1,6 +1,6 @@
 # Sky Healthcare — User Guide
 
-> **Note to editor:** Image placeholders are marked `<!-- IMAGE: … -->` throughout this document. Replace each one with the relevant screenshot before publishing.
+> **Note to editor:** Screenshots are referenced from `docs/images/`. Save each image file into that folder with the filename shown below each image tag.
 
 ---
 
@@ -9,24 +9,21 @@
 1. [What is Sky Healthcare?](#1-what-is-sky-healthcare)
 2. [Who uses it and what roles exist](#2-who-uses-it-and-what-roles-exist)
 3. [Getting around the interface](#3-getting-around-the-interface)
-4. [Patient management](#4-patient-management)
-   - 4.1 [Search for a patient](#41-search-for-a-patient)
-   - 4.2 [Register a new patient](#42-register-a-new-patient)
-   - 4.3 [Patient dashboard](#43-patient-dashboard)
-   - 4.4 [Record a consultation](#44-record-a-consultation)
-   - 4.5 [Enter a test result](#45-enter-a-test-result)
-   - 4.6 [Record a procedure or dispense medications](#46-record-a-procedure-or-dispense-medications)
-5. [Stock management](#5-stock-management)
-   - 5.1 [Medications and consumables catalogue](#51-medications-and-consumables-catalogue)
-   - 5.2 [Requisitions](#52-requisitions)
-   - 5.3 [Stock receipt](#53-stock-receipt)
-   - 5.4 [Stock status](#54-stock-status)
-   - 5.5 [Non-patient issues (expired, broken, lost)](#55-non-patient-issues-expired-broken-lost)
-6. [Settings (managers only)](#6-settings-managers-only)
-   - 6.1 [Procedure types](#61-procedure-types)
-   - 6.2 [Care staff](#62-care-staff)
-7. [Complete workflow examples](#7-complete-workflow-examples)
-8. [Frequently asked questions](#8-frequently-asked-questions)
+4. [Dashboard (Overview)](#4-dashboard-overview)
+5. [Patient management](#5-patient-management)
+   - 5.1 [Search for a patient](#51-search-for-a-patient)
+   - 5.2 [Register a new patient](#52-register-a-new-patient)
+   - 5.3 [Record a treatment](#53-record-a-treatment)
+6. [Stock management](#6-stock-management)
+   - 6.1 [Medicines catalogue](#61-medicines-catalogue)
+   - 6.2 [Medical requests (requisitions)](#62-medical-requests-requisitions)
+   - 6.3 [Give out stock](#63-give-out-stock)
+   - 6.4 [Reports](#64-reports)
+7. [Settings (managers only)](#7-settings-managers-only)
+   - 7.1 [Treatment types](#71-treatment-types)
+   - 7.2 [Staff](#72-staff)
+8. [Complete workflow examples](#8-complete-workflow-examples)
+9. [Frequently asked questions](#9-frequently-asked-questions)
 
 ---
 
@@ -34,13 +31,11 @@
 
 Sky Healthcare is a clinical interface for small health facilities — clinics and health centres. It sits on top of Frappe Healthcare and ERPNext, so all patient records and stock movements are stored in those systems. The interface itself hides the complexity: each routine task fits on one screen.
 
-<!-- IMAGE: home screen / app launch screen showing the three main areas -->
-
 Key things to know:
 
-- Every record you create here (patient, consultation, stock receipt) is a standard document visible to administrators in Frappe Desk and in standard reports.
+- Every record you create here (patient, treatment, stock receipt) is a standard document visible to administrators in Frappe Desk and in standard reports.
 - Stock always moves out of the batch that expires first (FEFO — first expiry, first out). You cannot dispense from an expired batch.
-- Saving a procedure automatically reduces the stock. If stock is insufficient, the save is refused and the system suggests adding a requisition.
+- Saving a treatment automatically reduces the stock. If stock is insufficient, the save is refused and the system suggests creating a medical request.
 
 ---
 
@@ -49,306 +44,261 @@ Key things to know:
 | Role | Main tasks |
 |------|-----------|
 | **Reception** | Search for and register patients |
-| **Doctor** | Open consultations, prescribe tests, procedures and medications |
-| **Nurse** | Record procedures and dispense medications |
-| **Stock manager** | Receive stock, fulfill requisitions, remove expired items |
-| **Manager / Administrator** | Configure procedure types, manage care staff accounts, access Frappe Desk |
-
-Each role has exactly the permissions it needs on the underlying documents. Staff never need to open Frappe Desk for routine tasks.
+| **Doctor / Nurse** | Record treatments, dispense medicines |
+| **Stock manager** | Add stock, approve medical requests, give out damaged or expired stock |
+| **Administrator** | Configure treatment types, manage staff accounts |
 
 ---
 
 ## 3. Getting around the interface
 
-The interface has three areas accessible from the navigation bar:
+The left sidebar has two sections:
 
-- **Patients** — everything related to a patient's care journey.
-- **Stock** — catalogue, receipts, status and issues.
-- **Settings** — procedure types and care staff (managers only).
+**Stock**
+- Dashboard
+- Medicines
+- Give out stock
+- Medical requests
+- Reports
 
-<!-- IMAGE: navigation bar with the three areas highlighted -->
+**Care**
+- Patients
+- Treatment types
 
----
-
-## 4. Patient management
-
-### 4.1 Search for a patient
-
-1. Go to **Patients**.
-2. Type the patient's last name or phone number in the search bar.
-3. The list filters as you type. Click the patient's row to open their dashboard.
-
-<!-- IMAGE: patient list with search bar -->
-
-> If no results appear, the patient has not been registered yet — see [4.2](#42-register-a-new-patient).
+**Team**
+- Staff
 
 ---
 
-### 4.2 Register a new patient
+## 4. Dashboard (Overview)
 
-1. Go to **Patients** and click **Create a patient**.
-2. Fill in the required fields:
-   - Last name, first name
-   - Sex
-   - Date of birth
-   - Phone number
-3. Fill in optional fields as available:
-   - Blood group
-   - Known allergies
-   - Medical history
-   - Emergency contact
+The dashboard is the first screen you see after logging in. It gives an instant overview of the facility's status.
+
+![Dashboard overview showing summary cards and recent consultations](images/dashboard.png)
+
+What you see:
+
+| Card | What it means |
+|------|--------------|
+| **Medicines** | Total number of medicine types in the catalogue and total units in stock |
+| **To restock** | Medicines below their alert threshold — needs a medical request |
+| **Expiring soon** | Batches expiring within the alert window, with a note if any are already expired |
+| **Patients** | Total registered patients and how many are new this month |
+
+Below the cards, **Recent consultations** lists the latest treatments recorded, with the patient name, reason, date and status.
+
+The quick-action buttons at the top right let you jump directly to: **Medical request**, **Give out**, **Record a treatment**, or **Add stock**.
+
+---
+
+## 5. Patient management
+
+### 5.1 Search for a patient
+
+1. Go to **Care → Patients**.
+2. Type the patient's name or phone number in the search bar.
+3. Click the patient's row to open their record.
+
+![Patients list with search bar and 19 registered patients](images/patients.png)
+
+The list shows each patient's name, sex, age, blood group, phone number, number of treatments, and last visit date. Click **+ Treatment** on any row to record a treatment directly.
+
+> If no results appear the patient has not been registered yet — click **New patient**.
+
+---
+
+### 5.2 Register a new patient
+
+1. Go to **Care → Patients** and click **New patient**.
+2. Fill in: last name, first name, sex, date of birth, phone number.
+3. Add optional fields as available: blood group, allergies, medical history, emergency contact.
 4. Click **Save**.
 
-The patient's dashboard opens immediately after saving.
-
-<!-- IMAGE: new patient form with required fields indicated -->
+The patient's record opens immediately after saving.
 
 ---
 
-### 4.3 Patient dashboard
+### 5.3 Record a treatment
 
-The dashboard shows everything about a patient on one page:
-
-- Identity, allergies, and medical history
-- Full history of consultations, tests, and procedures
-- Tests that are waiting for a result
-- Action links: **Edit record**, **New consultation**, open any test or procedure
-
-<!-- IMAGE: patient dashboard with sections labelled -->
-
----
-
-### 4.4 Record a consultation
-
-1. From the patient dashboard, click **New consultation**.
-2. The doctor and date are filled in automatically.
-3. Enter:
-   - Reason for visit
-   - Symptoms
-   - Diagnosis
-   - Notes (optional)
-4. Add prescriptions as needed:
-   - **Tests** — select the test type.
-   - **Procedures** — select the procedure type; a nurse will execute it later.
-   - **Medications** — select the medication for direct dispensing.
-5. Click **Save**.
-
-The consultation is added to the patient's history. Any prescribed tests or procedures appear as pending items on the dashboard.
-
-<!-- IMAGE: consultation form showing prescriptions section -->
-
----
-
-### 4.5 Enter a test result
-
-Prescribed tests appear in the **Tests awaiting results** section of the patient dashboard.
-
-1. Click the test to open it.
-2. Enter the result and the date it was received.
-3. Click **Save**.
-
-The result is attached to the consultation and visible in the patient's history.
-
-<!-- IMAGE: test form with result field -->
-
----
-
-### 4.6 Record a procedure or dispense medications
-
-Prescribed procedures and dispensing orders appear on the patient dashboard.
-
-1. Click the procedure or dispensing order to open it.
-2. The screen shows:
-   - The procedure type (or medication for dispensing)
-   - Medications and consumables proposed from the procedure type, with available stock quantities
-3. Adjust quantities actually used if they differ from the defaults.
+1. From the Patients list, click **+ Treatment** next to the patient, or open the patient and click **Record a treatment**.
+2. Select the treatment type — the medicines and consumables used by default are pre-filled from the treatment type.
+3. Adjust quantities if needed.
 4. Add the date, time, and any observations.
 5. Click **Save**.
 
-**If stock is sufficient:** the procedure is saved, stock is reduced batch by batch (oldest expiry first), and the procedure appears on the patient dashboard.
+**If stock is sufficient:** the treatment is saved and stock decreases automatically, batch by batch (oldest expiry first).
 
-**If stock is insufficient:** the save is refused. Add the missing product to a requisition (see [5.2](#52-requisitions)) and retry once stock has been received.
-
-<!-- IMAGE: procedure screen showing medications list with stock quantities -->
+**If stock is insufficient:** the save is refused. Create a medical request for the missing medicine (see [6.2](#62-medical-requests-requisitions)) and retry once stock has been received.
 
 ---
 
-## 5. Stock management
+## 6. Stock management
 
-### 5.1 Medications and consumables catalogue
+### 6.1 Medicines catalogue
 
-The catalogue is the master list of products the facility uses.
+The catalogue is the master list of all medicines and consumables the facility uses.
 
-**To view:** Go to **Stock → Medications and consumables**. Products are grouped by category (Medications, Consumables).
+![Medicines catalogue showing 15 medicines with stock levels, expiry and status badges](images/medicines.png)
 
-**To add a product:**
-1. Click **Add**.
-2. Fill in: name, category, unit of measure, alert threshold (minimum quantity before an alert is shown).
-3. For a medication, also fill in: generic name, therapeutic class, pharmaceutical form, strength.
-4. Click **Save**.
+**Filter tabs at the top:** All · Low stock · Out of stock · Expiring soon · Expired · In stock
 
-<!-- IMAGE: catalogue list and add product form -->
+**Columns:** Medicine name, category and form · Units in stock (with a visual bar) · Nearest expiry date · Location (shelf) · Status badge
 
-> The alert threshold triggers a warning on the Stock status screen and flags the product in the requisitions list.
-
----
-
-### 5.2 Requisitions
-
-A requisition records a need — products and quantities to request from the supply point.
-
-**To create a requisition:**
-1. Go to **Stock → Requisitions** and click **New requisition**.
-2. Enter: requester, date, and each product with the quantity needed.
+**To add a medicine:**
+1. Click **New medicine**.
+2. Fill in: name, category, unit, alert threshold, generic name, therapeutic class, form, strength.
 3. Click **Save**.
 
-**To fulfill a requisition (stock manager):**
-1. Open the requisition from the list.
-2. Click **Fulfill**.
-3. A stock receipt is pre-filled with the requested products. Complete it as described in [5.3](#53-stock-receipt).
-
-<!-- IMAGE: requisition list and fulfill button -->
+**To add stock for an existing medicine:**
+Click **+ Stock** on the medicine row, or use the **Add stock** button in the top right. Fill in: batch number, expiry date, quantity, price paid, then submit.
 
 ---
 
-### 5.3 Stock receipt
+### 6.2 Medical requests (requisitions)
 
-A stock receipt records products coming into the facility, whether from a supplier, a sales representative, or as opening stock.
+A medical request records a need — medicines and quantities to order from the supply point.
 
-1. Go to **Stock → Stock receipt** and click **New receipt** (or arrive here from a fulfilled requisition).
-2. Select the source: market, sales representative, or opening stock.
-3. For each product line, enter:
-   - Product
-   - Batch number
-   - Expiry date
-   - Quantity
-   - Price paid
-4. Click **Submit**.
+![Medical requests list showing approved and urgent requests](images/medical-requests.png)
 
-Stock quantities increase immediately. The new batches are visible in the stock status.
+**Status tabs:** All · Waiting for approval · Approved · Rejected
 
-<!-- IMAGE: stock receipt form with product lines -->
+Requests marked **Urgent** are highlighted in orange. Automatic requests are created by the system when a medicine falls below its alert threshold.
 
-> You can receive stock without a prior requisition by going directly to the Stock receipt screen.
+**To create a request:**
+1. Click **+ New request**.
+2. Enter the medicine, quantity needed, and required date.
+3. Click **Save**.
+
+The request stays in **Waiting for approval** until a manager approves it. Stock only goes up when the delivery arrives and someone records it with **Add stock** — approving a request does not add stock.
 
 ---
 
-### 5.4 Stock status
+### 6.3 Give out stock
 
-The stock status screen gives an overview of all quantities.
+Use this screen to remove medicines from stock for reasons other than a patient treatment: damaged stock, expired stock, or other authorised adjustments.
 
-- **Per product:** total quantity, broken down by batch.
-- **Alerts:**
-  - 🔴 **Expired** — batch is past its expiry date.
-  - 🟠 **Expiring soon** — batch expires within the alert window.
-  - 🟡 **Below threshold** — total quantity is below the alert threshold set in the catalogue.
-- **Movement history:** each line shows the quantity change, the date, and either the patient (for a procedure) or the reason (for a non-patient issue).
+![Give out stock screen with reason selector and recent give-outs list](images/give-out-stock.png)
 
-<!-- IMAGE: stock status screen with alert badges -->
+1. Go to **Stock → Give out stock**.
+2. Search for the medicine.
+3. Set the quantity using the number buttons (1 · 5 · 10 · 20 · 30) or the +/− controls.
+4. Select the reason:
+   - **Damaged stock**
+   - **Expired stock** — expired batches are listed automatically
+   - **Other authorised adjustment**
+5. Click **Submit**.
 
----
+The right panel shows the 12 most recent give-outs for reference.
 
-### 5.5 Non-patient issues (expired, broken, lost)
-
-Use this screen to remove products from stock for reasons other than patient care.
-
-**For expired medications:**
-1. Go to **Stock → Non-patient issue**.
-2. Select reason: **Expired**.
-3. The expired batches are listed automatically with their quantities.
-4. Physically remove the boxes.
-5. Adjust quantities if the actual count differs from the system.
-6. Click **Submit**.
-
-**For breakage or loss:**
-1. Go to **Stock → Non-patient issue**.
-2. Select reason: **Breakage** or **Loss**.
-3. Select the product, batch, and quantity.
-4. Click **Submit**.
-
-Stock decreases batch by batch immediately after submission.
-
-<!-- IMAGE: non-patient issue screen showing expired batches listed automatically -->
+> Medicine given to a patient is recorded as a treatment, not here. Use the **Open treatments** link if you need to correct a patient dispensing.
 
 ---
 
-## 6. Settings (managers only)
+### 6.4 Reports
 
-### 6.1 Procedure types
+The Reports screen covers all stock movements, expiry tracking, and stock levels. Any report can be downloaded as an Excel file.
 
-Procedure types define the default medications and consumables used in a given procedure, with their default quantities. When a nurse opens a procedure, these defaults are pre-filled, saving time and reducing errors.
+![Reports screen showing Movements tab with date range filter and 48 rows](images/reports.png)
 
-**To add a procedure type:**
-1. Go to **Settings → Procedure types** and click **New**.
-2. Enter the procedure name.
-3. Add each medication or consumable used by default, with its default quantity.
+**Three report tabs:**
+
+| Tab | What it shows |
+|-----|--------------|
+| **Movements** | Every stock change — received, used in a treatment, given out — with date, medicine, quantity, reason, batch, operator and running balance |
+| **Expiry** | All batches sorted by expiry date, to spot what expires soon |
+| **Stock levels** | Current quantity per medicine and per batch |
+
+**To filter Movements:**
+- Set a **From** and **To** date.
+- Choose a **Type** (All, Received, Treatment, Give-out).
+- Search by **Medicine** name.
+
+Click **Print** for a printable view or **Download (Excel)** to export.
+
+---
+
+## 7. Settings (managers only)
+
+### 7.1 Treatment types
+
+Treatment types define the default medicines and consumables used in a given procedure, with their default quantities. When a nurse records a treatment, these defaults are pre-filled, saving time and reducing errors.
+
+![Treatment types showing Malaria Procedure and wound dressing cards](images/treatment-types.png)
+
+Each card shows the treatment name, description, the medicines it uses with quantities, and how many times it has been used.
+
+**To add a treatment type:**
+1. Click **+ New treatment type**.
+2. Enter the name and description.
+3. Add each medicine or consumable with its default quantity.
 4. Click **Save**.
 
-<!-- IMAGE: procedure type form -->
+**To use a treatment type directly** from this screen, click **Use** on the card — it opens a new treatment pre-filled with that type.
 
 ---
 
-### 6.2 Care staff
+### 7.2 Staff
 
-Care staff records link a person's name and role to their Frappe login account, so the consultation form can fill in the doctor automatically.
+Staff records link a person's name and role to their login account.
+
+![Staff screen showing three staff cards with roles and last seen dates](images/staff.png)
+
+Each card shows the staff member's name, email, role (Administrator or Staff), and when they last logged in.
 
 **To add a staff member:**
-1. Go to **Settings → Care staff** and click **New**.
-2. Enter: name, role (Doctor, Nurse, etc.), and the linked login account.
+1. Click **+ Add a person**.
+2. Enter: name, email, and role.
 3. Click **Save**.
 
-<!-- IMAGE: care staff form -->
+The person receives login credentials and can access the app according to their role.
 
 ---
 
-## 7. Complete workflow examples
+## 8. Complete workflow examples
 
-### Walk-in patient
+### Walk-in patient receiving treatment
 
-1. Reception searches for the patient in **Patients**. Not found — clicks **Create a patient**, fills in the form, saves. The dashboard opens.
-2. The doctor opens a **New consultation** from the dashboard. Enters diagnosis and prescribes a procedure with two medications.
-3. The nurse opens the prescribed procedure from the dashboard. Confirms the quantities. Clicks **Save** — stock decreases automatically.
-4. The procedure appears in the patient's history.
+1. Reception searches for the patient in **Patients**. Not found — clicks **New patient**, fills in name, sex, date of birth and phone number, saves.
+2. The doctor clicks **+ Treatment** on the patient row, selects the treatment type (e.g. Malaria Procedure), confirms quantities, and saves.
+3. Stock decreases automatically (oldest expiry batch first). The treatment appears in the patient's history.
 
 ---
 
 ### Low-stock replenishment
 
-1. The stock manager sees a product flagged below threshold on **Stock status**.
-2. Opens **Requisitions**, creates a new requisition for that product.
-3. The supply point delivers. The stock manager opens the requisition, clicks **Fulfill**, completes the stock receipt with batch number, expiry date, quantity, and price, then submits.
-4. The stock status updates immediately. The alert clears.
+1. The dashboard shows **3 to restock**. The stock manager opens **Medical requests**, sees the automatic low-stock requests, and approves them.
+2. The supply point delivers. The stock manager goes to **Medicines**, finds the medicine, clicks **+ Stock**, enters batch number, expiry date, quantity and price, then submits.
+3. The dashboard restock count drops. The medicine's status changes from **Low stock** to **In stock**.
 
 ---
 
-### Removing expired medications
+### Removing damaged or expired stock
 
-1. The stock manager checks **Stock status** and sees expired batches flagged in red.
-2. Opens **Non-patient issue**, selects reason **Expired**.
-3. The expired batches are listed. The manager physically removes the boxes, adjusts quantities if needed, and submits.
-4. Stock decreases. The expired batches no longer appear.
+1. The stock manager goes to **Give out stock**.
+2. Selects the medicine, sets the quantity, chooses **Damaged stock** or **Expired stock**.
+3. Submits. Stock decreases and the movement is recorded in Reports with the reason.
 
 ---
 
-## 8. Frequently asked questions
+## 9. Frequently asked questions
 
-**Can I undo a submitted stock receipt?**
+**Can I undo a submitted stock movement?**
 Submissions are reversible by an administrator in Frappe Desk. Contact your site administrator.
 
-**What happens if I try to dispense more than what is in stock?**
-The save is refused with a message indicating which product is short. Create a requisition for the missing product, wait for the stock receipt, then retry the procedure.
+**What happens if I try to record a treatment with insufficient stock?**
+The save is refused with a message indicating which medicine is short. Create a medical request, wait for the stock to be received, then retry the treatment.
 
 **Why does the system pick a specific batch instead of letting me choose?**
-The system always uses the batch that expires first (FEFO). This minimises waste and prevents expired products from being dispensed to patients.
+The system always uses the batch that expires first (FEFO). This minimises waste and prevents expired medicines from being given to patients.
 
-**A product shows as expired in the system but the box says it is not. What do I do?**
-Check the expiry date entered during the stock receipt. If it was entered incorrectly, an administrator can correct it in Frappe Desk before the batch is used.
+**A medicine shows as expired in the system but the box says it is not. What do I do?**
+Check the expiry date entered when the stock was received. If it was entered incorrectly, an administrator can correct it in Frappe Desk before the batch is used.
 
-**I need a feature that is not in the interface (billing, inpatient care, etc.).**
-The underlying records (consultations, procedures, stock movements) are standard Frappe Healthcare and ERPNext documents. These features can be managed in Frappe Desk by an administrator, or added to the interface in a future release.
+**Approving a medical request did not increase the stock. Is that normal?**
+Yes. A request is an order, not a receipt. Stock only goes up when the delivery physically arrives and someone records it with **Add stock** in the Medicines screen.
 
 **Who can access Frappe Desk?**
-Only administrators. Clinic staff work exclusively in the Sky Healthcare interface and do not need Desk access.
+Only administrators. All routine tasks for clinic staff are available within the Sky Healthcare interface.
 
 ---
 
