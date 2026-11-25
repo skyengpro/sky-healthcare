@@ -1,6 +1,5 @@
 # Sky Healthcare — User Guide
 
-> **Note to editor:** Screenshots are referenced from `docs/images/`. Save each image file into that folder with the filename shown below each image tag.
 
 ---
 
